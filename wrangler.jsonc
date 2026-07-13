@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ruzsa-genus-one",
+  "account_id": "641ee17fdc075e1c2f3b2cfc7ffdea81",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-01",
+  // Uncomment once a custom domain is chosen:
+  // "routes": [{ "pattern": "ruzsa.icarm.cloud", "custom_domain": true }],
+  "assets": {
+    "directory": "./public"
+  },
+  "observability": {
+    "enabled": true
+  }
+}
