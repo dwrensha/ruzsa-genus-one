@@ -176,7 +176,7 @@ function witnessPlot(pts: RecordPoint[]): string {
       const beats = ratio > 1
       return `<a href="/witness/${p.id}"><circle class="dot${beats ? ' beats-sqrt' : ''}" cx="${X(
         Math.log10(p.n),
-      ).toFixed(1)}" cy="${Y(Math.log10(p.size)).toFixed(1)}" r="${beats ? 6 : 4.5}"><title>N = ${p.n.toLocaleString(
+      ).toFixed(1)}" cy="${Y(Math.log10(p.size)).toFixed(1)}" r="${beats ? 4.5 : 3}"><title>N = ${p.n.toLocaleString(
         'en-US',
       )}: record |A| = ${p.size.toLocaleString('en-US')} (score ${(ratio).toFixed(4)})</title></circle></a>`
     })

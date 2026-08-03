@@ -338,7 +338,7 @@ var {
 
 .records-plot a:hover .dot {
   fill: #ffd267;
-  r: 7;
+  r: 5;
 }
 
 .witness-meta {
