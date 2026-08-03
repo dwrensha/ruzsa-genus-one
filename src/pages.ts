@@ -303,16 +303,17 @@ function resultSection(result: VerifyResult, record?: RecordStatus): string {
 
 export function landingPage(
   user: User | null = null,
-  result?: VerifyResult,
-  form: FormState = {},
-  record?: RecordStatus,
   records: RecordPoint[] = [],
+  resultExpired = false,
 ): string {
+  const expiredNote = resultExpired
+    ? '<section class="prose"><p class="muted">That result link has expired &mdash; submit the set again below.</p></section>'
+    : ''
   const body = `
     ${problemStatement()}
-    ${result ? resultSection(result, record) : ''}
+    ${expiredNote}
     ${recordsSection(records)}
-    ${verifierForm(form, user)}
+    ${verifierForm({}, user)}
     <section class="prose api-note">
       <h2>API</h2>
       <p>
@@ -322,6 +323,24 @@ export function landingPage(
       </p>
     </section>`
   return layout(SITE_NAME, body, user)
+}
+
+// Post/Redirect/Get target for non-record submissions: the verdict plus the
+// form, pre-filled for quick iteration. Served from a short-lived KV flash,
+// so reloading is harmless.
+export function resultPage(
+  user: User | null,
+  result: VerifyResult,
+  record: RecordStatus | undefined,
+  form: FormState,
+): string {
+  const body = `
+    <section class="prose">
+      <p class="page-nav"><a href="/">&larr; home</a></p>
+    </section>
+    ${resultSection(result, record)}
+    ${verifierForm(form, user)}`
+  return layout(`Result — ${SITE_NAME}`, body, user)
 }
 
 function userWitnessesSection(rows: UserWitnessRow[]): string {
@@ -509,6 +528,7 @@ export function witnessDetailPage(
   w: WitnessView,
   comment: CommentView | null = null,
   user: User | null = null,
+  justRecorded = false,
 ): string {
   let elements: number[] = []
   try {
@@ -526,6 +546,7 @@ export function witnessDetailPage(
   const body = `
     <section class="prose">
       <p class="page-nav"><a href="/">&larr; home</a> &nbsp;&middot;&nbsp; <a href="/recent">recent activity</a></p>
+      ${justRecorded ? `<p class="record-new">New record: the largest known witness for N = ${w.n.toLocaleString('en-US')}. Saved. 🏅</p>` : ''}
       <h2>witness #${w.id}</h2>
       <dl class="stats">
         <div><dt>N</dt><dd>${w.n.toLocaleString('en-US')}</dd></div>

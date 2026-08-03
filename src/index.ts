@@ -7,7 +7,9 @@ import {
   landingPage,
   notFoundPage,
   profilePage,
+  resultPage,
   witnessDetailPage,
+  type FormState,
 } from './pages'
 import {
   type AppEnv,
@@ -49,7 +51,11 @@ app.use('*', async (c, next) => {
   await next()
 })
 
-app.get('/', async (c) => c.html(landingPage(c.get('user'), undefined, {}, undefined, await currentRecords(c.env))))
+app.get('/', async (c) =>
+  c.html(
+    landingPage(c.get('user'), await currentRecords(c.env), c.req.query('expired') === '1'),
+  ),
+)
 
 app.get('/auth/:provider', startOAuth)
 app.get('/auth/:provider/callback', handleCallback)
@@ -64,7 +70,9 @@ app.get('/witness/:id', async (c) => {
   if (!Number.isInteger(id)) return c.html(notFoundPage(c.get('user')), 404)
   const loaded = await loadWitness(c.env, id)
   if (!loaded) return c.html(notFoundPage(c.get('user')), 404)
-  return c.html(witnessDetailPage(loaded.witness, loaded.comment, c.get('user')))
+  return c.html(
+    witnessDetailPage(loaded.witness, loaded.comment, c.get('user'), c.req.query('new') === '1'),
+  )
 })
 
 app.post('/witness/:id/commentary', async (c) => {
@@ -161,11 +169,23 @@ function verifyFromText(nText: string, elementsText: string): VerifyResult {
   return verify(N, parsed)
 }
 
-// The verify form POSTs here and the result is rendered in place, so the
-// browser's location is /verify; a later plain GET (refresh, OAuth return,
-// bookmark) should land home rather than 404.
+// A stray GET (old bookmark, stale OAuth return) lands home rather than 404.
 app.get('/verify', (c) => c.redirect('/', 302))
 
+// Verdict + form state stashed between the POST and the redirected GET.
+// The element list is dropped from the stored result (the page never shows
+// it; the form echo comes from the raw text in `form`).
+interface ResultFlash {
+  result: VerifyResult
+  record?: RecordStatus
+  form: FormState
+}
+
+const RESULT_FLASH_TTL_SEC = 10 * 60
+
+// Post/Redirect/Get: a record-setting submission redirects to its new witness
+// page; anything else stores a short-lived flash and redirects to /result/:key,
+// so reloading the result never re-submits the form.
 app.post('/verify', async (c) => {
   const user = c.get('user')
   if (!user) return c.redirect('/auth/github?return_to=/', 302)
@@ -176,16 +196,26 @@ app.post('/verify', async (c) => {
   let record: RecordStatus | undefined
   if (result.ok && result.valid) {
     record = await recordWitness(c.env, result, user.id)
+    if (record.recorded) return c.redirect(`/witness/${record.witnessId}?new=1`, 303)
   }
-  return c.html(
-    landingPage(
-      c.get('user'),
-      result,
-      { nValue: nText, elementsValue: elementsText },
-      record,
-      await currentRecords(c.env),
-    ),
-  )
+  const flash: ResultFlash = {
+    result: result.ok ? { ...result, elements: [] } : result,
+    record,
+    form: { nValue: nText, elementsValue: elementsText },
+  }
+  const key = crypto.randomUUID()
+  await c.env.SESSIONS.put(`result:${key}`, JSON.stringify(flash), {
+    expirationTtl: RESULT_FLASH_TTL_SEC,
+  })
+  return c.redirect(`/result/${key}`, 303)
+})
+
+app.get('/result/:key', async (c) => {
+  const key = c.req.param('key')
+  if (!/^[0-9a-f-]{36}$/.test(key)) return c.html(notFoundPage(c.get('user')), 404)
+  const flash = (await c.env.SESSIONS.get(`result:${key}`, 'json')) as ResultFlash | null
+  if (!flash) return c.redirect('/?expired=1', 302)
+  return c.html(resultPage(c.get('user'), flash.result, flash.record, flash.form))
 })
 
 app.post('/api/verify', async (c) => {
