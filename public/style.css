@@ -315,26 +315,6 @@ var {
   r: 7;
 }
 
-/* Instant hover label for a dot: hidden until its link is hovered/focused;
-   a stroke halo in the background color keeps it legible over gridlines. */
-.records-plot .dot-tip {
-  display: none;
-  fill: var(--fg);
-  font-size: 13px;
-  font-weight: 600;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  paint-order: stroke;
-  stroke: var(--bg);
-  stroke-width: 4px;
-  stroke-linejoin: round;
-  pointer-events: none;
-}
-
-.records-plot a:hover .dot-tip,
-.records-plot a:focus .dot-tip {
-  display: block;
-}
-
 .witness-meta {
   margin: 1rem 0;
 }
