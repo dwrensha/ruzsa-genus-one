@@ -14,8 +14,8 @@
 // a saturated bucket has r1(v) ≥ 255 ≥ 2, so any (c,d) pair landing on it
 // already pushes the sum past |A|.
 
-export const MAX_N = 50_000_000
-export const MAX_SET_SIZE = 20_000
+export const MAX_N = 50_000
+export const MAX_SET_SIZE = 10_000
 export const MAX_ELEMENTS_TEXT_BYTES = 1_000_000
 
 export interface Counterexample {

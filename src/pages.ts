@@ -90,8 +90,6 @@ export function layout(title: string, bodyInner: string, user: User | null = nul
           <a href="/recent">recent activity</a> &nbsp;&middot;&nbsp;
           <a href="/api">API</a>
         </nav>
-        <p>Verification runs server-side in O(|A|&sup2;) time.
-           Limits: N &le; ${MAX_N.toLocaleString('en-US')}, |A| &le; ${MAX_SET_SIZE.toLocaleString('en-US')}.</p>
       </div>
     </footer>
   </body>
@@ -216,6 +214,8 @@ function verifierForm(state: FormState): string {
       <textarea id="A" name="A" rows="8" required
                 placeholder="e.g. 0, 260, 268, 280, ...">${escapeHtml(state.elementsValue ?? '')}</textarea>
       <button type="submit">Verify</button>
+      <p class="muted form-note">Verification runs server-side in O(|A|&sup2;) time.
+         Limits: N &le; ${MAX_N.toLocaleString('en-US')}, |A| &le; ${MAX_SET_SIZE.toLocaleString('en-US')}.</p>
     </form>
   </section>`
 }

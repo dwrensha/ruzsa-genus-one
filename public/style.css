@@ -189,6 +189,11 @@ var {
   margin-top: 0.2rem;
 }
 
+.form-note {
+  font-size: 0.85rem;
+  margin: 0.8rem 0 0;
+}
+
 /* Profile: API tokens & record witnesses */
 
 .page-nav {
