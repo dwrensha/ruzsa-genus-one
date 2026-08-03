@@ -183,6 +183,11 @@ function verifyFromText(nText: string, elementsText: string): VerifyResult {
   return verify(N, parsed)
 }
 
+// The verify form POSTs here and the result is rendered in place, so the
+// browser's location is /verify; a later plain GET (refresh, OAuth return,
+// bookmark) should land home rather than 404.
+app.get('/verify', (c) => c.redirect('/', 302))
+
 app.post('/verify', async (c) => {
   const body = await c.req.parseBody()
   const nText = typeof body.N === 'string' ? body.N : ''

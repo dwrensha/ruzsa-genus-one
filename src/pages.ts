@@ -241,12 +241,14 @@ function recordSection(size: number, N: number, record?: RecordDisplay): string 
   const recordLink = (text: string) =>
     record.witnessId ? `<a href="/witness/${record.witnessId}">${text}</a>` : text
   if (record.kind === 'login-required') {
+    // The result page is the response to POST /verify, so the Referer-based
+    // OAuth return would land on a GET-less path; return to / explicitly.
     if (record.wouldRecord) {
-      return `<p class="record-new">This would set the record for N = ${nStr} &mdash; <a href="/auth/github">log in</a> to record it.</p>`
+      return `<p class="record-new">This would set the record for N = ${nStr} &mdash; <a href="/auth/github?return_to=/">log in</a> to record it (resubmit after logging in).</p>`
     }
     return `<p class="muted">The ${recordLink('record witness')} for N = ${nStr} has |A| = ${record.recordSize!.toLocaleString(
       'en-US',
-    )}. <a href="/auth/github">Log in</a> to have record-setting witnesses saved to your name.</p>`
+    )}. <a href="/auth/github?return_to=/">Log in</a> to have record-setting witnesses saved to your name.</p>`
   }
   if (record.recorded) {
     return `<p class="record-new">New record: the largest known witness for N = ${nStr}. Saved as ${recordLink(
