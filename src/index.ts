@@ -1,13 +1,22 @@
 import { Hono } from 'hono'
-import { landingPage, notFoundPage } from './pages'
+import { apiDocsPage, landingPage, notFoundPage, profilePage } from './pages'
 import {
   type AppEnv,
+  generateApiToken,
   loadCurrentUser,
+  loadUserFromToken,
   startOAuth,
   handleCallback,
   logout,
+  updateSessionUser,
 } from './auth'
-import { currentRecords, recordWitness, type RecordStatus } from './store'
+import {
+  currentRecords,
+  listTokens,
+  recordWitness,
+  userWitnesses,
+  type RecordStatus,
+} from './store'
 import {
   MAX_ELEMENTS_TEXT_BYTES,
   MAX_SET_SIZE,
@@ -18,10 +27,11 @@ import {
 
 const app = new Hono<AppEnv>()
 
-// Resolve the current user from the session cookie for every request; the
-// lookup short-circuits cheaply when the cookie is absent.
+// Resolve the current user (session cookie, else API bearer token) for every
+// request. Both lookups short-circuit cheaply when their credential is absent.
 app.use('*', async (c, next) => {
-  c.set('user', await loadCurrentUser(c))
+  const user = (await loadCurrentUser(c)) ?? (await loadUserFromToken(c))
+  c.set('user', user)
   await next()
 })
 
@@ -30,6 +40,57 @@ app.get('/', async (c) => c.html(landingPage(c.get('user'), undefined, {}, undef
 app.get('/auth/:provider', startOAuth)
 app.get('/auth/:provider/callback', handleCallback)
 app.post('/auth/logout', logout)
+
+app.get('/api', (c) => c.html(apiDocsPage(c.get('user'))))
+
+app.get('/profile', async (c) => {
+  const user = c.get('user')
+  if (!user) return c.redirect('/auth/github?return_to=/profile', 302)
+  const [tokens, witnesses] = await Promise.all([
+    listTokens(c.env, user.id),
+    userWitnesses(c.env, user.id),
+  ])
+  return c.html(profilePage(user, tokens, null, witnesses))
+})
+
+app.post('/profile/tokens', async (c) => {
+  const user = c.get('user')
+  if (!user) return c.redirect('/auth/github', 302)
+  const form = await c.req.parseBody()
+  const name = String(form.name ?? '').trim().slice(0, 100) || null
+  const newToken = await generateApiToken(c.env, user.id, name)
+  const [tokens, witnesses] = await Promise.all([
+    listTokens(c.env, user.id),
+    userWitnesses(c.env, user.id),
+  ])
+  return c.html(profilePage(user, tokens, newToken, witnesses))
+})
+
+app.post('/profile/tokens/:id/revoke', async (c) => {
+  const user = c.get('user')
+  if (!user) return c.redirect('/auth/github', 302)
+  const id = Number(c.req.param('id'))
+  if (Number.isInteger(id)) {
+    await c.env.DB.prepare(
+      'UPDATE api_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ? AND revoked_at IS NULL',
+    )
+      .bind(id, user.id)
+      .run()
+  }
+  return c.redirect('/profile', 302)
+})
+
+app.post('/profile/name', async (c) => {
+  const user = c.get('user')
+  if (!user) return c.redirect('/auth/github', 302)
+  const form = await c.req.parseBody()
+  const name = String(form.name ?? '').trim().slice(0, 100)
+  if (name) {
+    await c.env.DB.prepare('UPDATE users SET display_name = ? WHERE id = ?').bind(name, user.id).run()
+    await updateSessionUser(c, { display_name: name })
+  }
+  return c.redirect('/profile', 302)
+})
 
 function verifyFromText(nText: string, elementsText: string): VerifyResult {
   if (elementsText.length > MAX_ELEMENTS_TEXT_BYTES) {

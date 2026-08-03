@@ -90,7 +90,7 @@ header nav .auth-nav {
   white-space: nowrap;
 }
 
-header nav .auth-nav a {
+header nav .auth-nav a.auth-login {
   display: inline-block;
   padding: 0.35rem 0.9rem;
   border: 1px solid var(--accent-dim);
@@ -101,14 +101,19 @@ header nav .auth-nav a {
   text-decoration: none;
 }
 
-header nav .auth-nav a:hover {
+header nav .auth-nav a.auth-login:hover {
   border-color: var(--accent);
   background: rgba(251, 191, 36, 0.1);
 }
 
-.auth-user {
+a.auth-user {
   font-weight: 600;
   color: var(--fg);
+  text-decoration: none;
+}
+
+a.auth-user:hover {
+  color: var(--accent);
 }
 
 .auth-logout {
@@ -117,6 +122,7 @@ header nav .auth-nav a:hover {
 }
 
 .auth-logout button {
+  margin: 0;
   background: none;
   border: none;
   color: var(--muted);
@@ -194,6 +200,116 @@ var {
 .plot-caption {
   font-size: 0.85rem;
   margin-top: 0.2rem;
+}
+
+/* Profile: API tokens & record witnesses */
+
+.page-nav {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+}
+
+.page-nav a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.page-nav a:hover {
+  text-decoration: underline;
+}
+
+.new-token {
+  border: 1px solid var(--accent);
+  background: rgba(251, 191, 36, 0.08);
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin: 1rem 0;
+}
+
+.token-secret {
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  padding: 0.5rem 0.75rem;
+  border-radius: 3px;
+  overflow-x: auto;
+  white-space: nowrap;
+  font-size: 0.95rem;
+  margin: 0.5rem 0;
+}
+
+.tokens-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.95rem;
+}
+
+.tokens-table th, .tokens-table td {
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid var(--panel-edge);
+  vertical-align: top;
+}
+
+.tokens-table th.num, .tokens-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tokens-table code {
+  font-size: 0.9rem;
+}
+
+.inline-form {
+  display: inline;
+  margin: 0;
+}
+
+.link-button {
+  margin: 0;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 400;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.link-button:hover {
+  color: var(--accent);
+}
+
+.new-token-form,
+.profile-name-form {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.new-token-form label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0;
+}
+
+.new-token-form input,
+.profile-name-form input {
+  width: auto;
+  flex: 0 1 16rem;
+}
+
+.new-token-form button,
+.profile-name-form button {
+  margin-top: 0;
+}
+
+.my-witnesses {
+  margin-top: 2rem;
 }
 
 .display-eq {

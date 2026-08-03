@@ -3,8 +3,30 @@
 // modulus survives being beaten.
 
 import type { Bindings } from './auth'
-import type { RecordPoint } from './pages'
+import type { RecordPoint, TokenRow, UserWitnessRow } from './pages'
 import type { VerifyResult } from './verify'
+
+export function listTokens(env: Bindings, userId: number): Promise<TokenRow[]> {
+  return env.DB.prepare(
+    `SELECT id, name, prefix, created_at, last_used_at, revoked_at
+       FROM api_tokens WHERE user_id = ? ORDER BY id DESC`,
+  )
+    .bind(userId)
+    .all<TokenRow>()
+    .then((r) => r.results)
+}
+
+/** The user's record-setting witnesses, best score first, flagged when still the record. */
+export function userWitnesses(env: Bindings, userId: number): Promise<UserWitnessRow[]> {
+  return env.DB.prepare(
+    `SELECT w.n, w.size, w.ratio, w.created_at,
+            (w.size = (SELECT MAX(size) FROM witnesses WHERE n = w.n)) AS is_current
+       FROM witnesses w WHERE w.submitter_user_id = ? ORDER BY w.ratio DESC, w.n`,
+  )
+    .bind(userId)
+    .all<UserWitnessRow>()
+    .then((r) => r.results)
+}
 
 export type ValidResult = Extract<VerifyResult, { ok: true }>
 

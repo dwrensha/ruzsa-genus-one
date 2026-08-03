@@ -15,6 +15,23 @@ export interface User {
   avatar_url?: string | null
 }
 
+export interface TokenRow {
+  id: number
+  name: string | null
+  prefix: string
+  created_at: string
+  last_used_at: string | null
+  revoked_at: string | null
+}
+
+export interface UserWitnessRow {
+  n: number
+  size: number
+  ratio: number
+  created_at: string
+  is_current: number // SQLite boolean: 1 when still the record for n
+}
+
 export function escapeHtml(s: unknown): string {
   if (s == null) return ''
   return String(s)
@@ -34,11 +51,11 @@ function authNav(user: User | null): string {
   if (user) {
     const name = escapeHtml(user.display_name || user.email || 'user')
     return (
-      `<span class="auth-user">${name}</span>` +
+      `<a href="/profile" class="auth-user">${name}</a>` +
       `<form class="auth-logout" method="post" action="/auth/logout"><button type="submit">log out</button></form>`
     )
   }
-  return `<a href="/auth/github">log in with GitHub</a>`
+  return `<a class="auth-login" href="/auth/github">log in with GitHub</a>`
 }
 
 export function layout(title: string, bodyInner: string, user: User | null = null): string {
@@ -279,10 +296,151 @@ export function landingPage(
       <p>
         <code>POST /api/verify</code> with JSON body
         <code>{"N": 25045, "A": [0, 260, ...]}</code> returns the same verdict
-        as JSON.
+        as JSON. See the <a href="/api">API docs</a>.
       </p>
     </section>`
   return layout(SITE_NAME, body, user)
+}
+
+function userWitnessesSection(rows: UserWitnessRow[]): string {
+  const heading = `<h3>Your record witnesses <span class="muted">(${rows.length})</span></h3>`
+  if (rows.length === 0) {
+    return `<section class="my-witnesses">
+      ${heading}
+      <p class="muted">None yet &mdash; a witness is saved here when it sets the record for its modulus. <a href="/">Verify one &rarr;</a></p>
+    </section>`
+  }
+  const trs = rows
+    .map(
+      (w) => `<tr>
+        <td class="num">${w.n.toLocaleString('en-US')}</td>
+        <td class="num">${w.size.toLocaleString('en-US')}</td>
+        <td class="num">${w.ratio.toFixed(4)}</td>
+        <td>${escapeHtml(w.created_at)}</td>
+        <td>${w.is_current ? 'current record' : '<span class="muted">superseded</span>'}</td>
+      </tr>`,
+    )
+    .join('\n')
+  return `<section class="my-witnesses">
+      ${heading}
+      <p class="muted">Witnesses that set the record for their modulus when you submitted them, best score first.</p>
+      <table class="tokens-table">
+        <thead><tr><th class="num">N</th><th class="num">|A|</th><th class="num">score</th><th>Submitted</th><th>Status</th></tr></thead>
+        <tbody>${trs}</tbody>
+      </table>
+    </section>`
+}
+
+export function profilePage(
+  user: User,
+  tokens: TokenRow[],
+  newToken: { token: string; prefix: string } | null,
+  witnesses: UserWitnessRow[] = [],
+): string {
+  const newTokenBlock = newToken
+    ? `<div class="new-token">
+        <p><strong>New token created.</strong> Copy it now &mdash; this is the only time it will be shown.</p>
+        <pre class="token-secret">${escapeHtml(newToken.token)}</pre>
+        <p class="muted">Send it as <code>Authorization: Bearer ${escapeHtml(newToken.token)}</code> when calling the API.</p>
+      </div>`
+    : ''
+  const tokenRows = tokens.length
+    ? tokens
+        .map((t) => {
+          const label = t.name ? escapeHtml(t.name) : '<span class="muted">(unnamed)</span>'
+          const status = t.revoked_at
+            ? `<span class="muted">revoked ${escapeHtml(t.revoked_at)}</span>`
+            : `<form method="post" action="/profile/tokens/${t.id}/revoke" class="inline-form"><button type="submit" class="link-button">revoke</button></form>`
+          const lastUsed = t.last_used_at
+            ? escapeHtml(t.last_used_at)
+            : '<span class="muted">never</span>'
+          return `<tr>
+            <td><code>${escapeHtml(t.prefix)}&hellip;</code></td>
+            <td>${label}</td>
+            <td>${escapeHtml(t.created_at)}</td>
+            <td>${lastUsed}</td>
+            <td>${status}</td>
+          </tr>`
+        })
+        .join('\n')
+    : `<tr><td colspan="5" class="muted">No tokens yet.</td></tr>`
+  const body = `
+    <section class="prose">
+      <p class="page-nav"><a href="/">&larr; home</a></p>
+      <h2>Profile</h2>
+      <p class="muted">Signed in as ${escapeHtml(user.display_name || user.email || 'user')} (via ${escapeHtml(
+        user.provider,
+      )}).</p>
+      ${newTokenBlock}
+      <section class="profile-name">
+        <h3>Display name</h3>
+        <form method="post" action="/profile/name" class="profile-name-form">
+          <input type="text" name="name" value="${escapeHtml(user.display_name || '')}" maxlength="100" required />
+          <button type="submit">save</button>
+        </form>
+      </section>
+      <section class="tokens">
+        <h3>API tokens</h3>
+        <p>Send a token in the <code>Authorization: Bearer &hellip;</code> header to call the <a href="/api">API</a> as yourself, so record witnesses are attributed to you.</p>
+        <table class="tokens-table">
+          <thead><tr><th>Prefix</th><th>Name</th><th>Created</th><th>Last used</th><th></th></tr></thead>
+          <tbody>${tokenRows}</tbody>
+        </table>
+        <form method="post" action="/profile/tokens" class="new-token-form">
+          <label>Name (optional) <input type="text" name="name" maxlength="100" placeholder="e.g. laptop CLI" /></label>
+          <button type="submit">Generate new token</button>
+        </form>
+      </section>
+      ${userWitnessesSection(witnesses)}
+    </section>`
+  return layout(`Profile — ${SITE_NAME}`, body, user)
+}
+
+export function apiDocsPage(user: User | null = null): string {
+  const verifyReq = `curl -X POST https://ruzsa-genus-one.icarm.cloud/api/verify \\
+  -H 'content-type: application/json' \\
+  -H 'authorization: Bearer ruzsa_...' \\
+  -d '{ "N": 49, "A": [0, 7, 13, 29, 41] }'`
+  const verifyResp = `{
+  "ok": true,
+  "N": 49,
+  "size": 5,
+  "ratio": 0.7142857142857143,     // |A| / sqrt(N), the score
+  "valid": true,
+  "record": { "recorded": true, "recordSize": 5 }
+}`
+  const invalidResp = `{
+  "ok": true,
+  "valid": false,
+  "counterexample": { "a": 3, "b": 1, "c": 1, "d": 2 },  // a + 3b ≡ 2c + 2d (mod N)
+  ...
+}`
+  const body = `
+    <section class="prose">
+      <p class="page-nav"><a href="/">&larr; home</a></p>
+      <h2>API</h2>
+
+      <h3>POST <code>/api/verify</code></h3>
+      <p>Verifies that a set <var>A</var> &sube; <span class="math">&#8484;/N&#8484;</span> contains no
+      nontrivial solutions to <span class="eq">a + 3b &equiv; 2c + 2d (mod N)</span>. Elements are
+      reduced mod <var>N</var>; duplicates after reduction are rejected. Limits:
+      <var>N</var> &le; ${MAX_N.toLocaleString('en-US')} and
+      |<var>A</var>| &le; ${MAX_SET_SIZE.toLocaleString('en-US')}.</p>
+      <p>Authorization is optional. With a bearer token (create one on your
+      <a href="/profile">profile</a> page) a record-setting witness is attributed to your account;
+      without one it is recorded anonymously.</p>
+      <pre><code>${escapeHtml(verifyReq)}</code></pre>
+      <p>Returns <code>200</code> with the verdict, or <code>400</code> if the body isn&rsquo;t JSON of
+      the form <code>{"N": &lt;integer&gt;, "A": [&lt;integers&gt;]}</code> or violates the limits.
+      A <em>valid</em> witness that is larger than every previously recorded witness for its modulus
+      is saved, and <code>record.recorded</code> is <code>true</code>; otherwise
+      <code>record.recordSize</code> reports the standing record.</p>
+      <pre><code>${escapeHtml(verifyResp)}</code></pre>
+      <p>An invalid set instead gets <code>valid: false</code> and one concrete nontrivial solution
+      (no <code>record</code> field):</p>
+      <pre><code>${escapeHtml(invalidResp)}</code></pre>
+    </section>`
+  return layout(`API — ${SITE_NAME}`, body, user)
 }
 
 export function notFoundPage(user: User | null = null): string {
