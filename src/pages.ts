@@ -204,8 +204,8 @@ function recordsSection(records: RecordPoint[]): string {
     <h2>Records</h2>
     ${inner}
     <p class="muted plot-caption">Each dot is the largest known witness for its modulus.
-    A dot above the dashed line beats &radic;<span class="sqrt">N</span>.
-    <a href="/database.json" download>Download all records (JSON) &darr;</a></p>
+    A dot above the dashed line beats &radic;<span class="sqrt">N</span>.</p>
+    <p class="plot-caption"><a class="nowrap" href="/database.json" download>Download all records (JSON) &darr;</a></p>
   </section>`
 }
 
