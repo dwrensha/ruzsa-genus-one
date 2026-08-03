@@ -54,8 +54,11 @@ export function layout(title: string, bodyInner: string, user: User | null = nul
   <body>
     <header>
       <div class="inner">
-        <h1><a href="/"><span class="eq">a&#8202;+&#8202;3b&#8202;=&#8202;2c&#8202;+&#8202;2d</span></a></h1>
-        <nav><span class="tagline">Ruzsa&rsquo;s genus-one problem</span><span class="auth-nav">${authNav(user)}</span></nav>
+        <div class="title-group">
+          <h1><a href="/"><span class="eq">a&#8202;+&#8202;3b&#8202;=&#8202;2c&#8202;+&#8202;2d</span></a></h1>
+          <span class="tagline">Ruzsa&rsquo;s genus-one problem</span>
+        </div>
+        <nav><span class="auth-nav">${authNav(user)}</span></nav>
       </div>
     </header>
     <main>${bodyInner}</main>
