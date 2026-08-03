@@ -245,9 +245,14 @@ function recordSection(size: number, N: number, record?: RecordStatus): string {
     )}.</p>`
   }
   if (record.recordSize === size) {
+    if (record.tiedExact) {
+      return `<p class="muted">This is exactly the ${recordLink('current record witness')} for N = ${nStr} (|A| = ${record.recordSize.toLocaleString(
+        'en-US',
+      )}), element for element.</p>`
+    }
     return `<p class="muted">Ties the ${recordLink('current record')} for N = ${nStr} (|A| = ${record.recordSize.toLocaleString(
       'en-US',
-    )}), which stands.</p>`
+    )}) with a <em>different</em> set of the same size &mdash; the standing record keeps its place.</p>`
   }
   return `<p class="muted">The ${recordLink('record witness')} for N = ${nStr} has |A| = ${record.recordSize.toLocaleString(
     'en-US',
@@ -477,7 +482,9 @@ export function apiDocsPage(user: User | null = null): string {
       the form <code>{"N": &lt;integer&gt;, "A": [&lt;integers&gt;]}</code> or violates the limits.
       A <em>valid</em> witness that is larger than every previously recorded witness for its modulus
       is saved, and <code>record.recorded</code> is <code>true</code>; otherwise
-      <code>record.recordSize</code> reports the standing record.</p>
+      <code>record.recordSize</code> reports the standing record. When a valid submission ties the
+      record, <code>record.tiedExact</code> reports whether it is element-for-element the record
+      witness itself (<code>true</code>) or a different set of the same size (<code>false</code>).</p>
       <pre><code>${escapeHtml(verifyResp)}</code></pre>
       <p>An invalid set instead gets <code>valid: false</code> and one concrete nontrivial solution
       (no <code>record</code> field):</p>

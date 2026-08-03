@@ -161,6 +161,12 @@ export interface RecordStatus {
   recordSize: number
   /** Row id of the current record witness (the new row when recorded). */
   witnessId: number
+  /**
+   * Only set on a tie (recorded false, recordSize equal): true when the
+   * submitted set is element-for-element the current record witness, false
+   * when it is a different set of the same size.
+   */
+  tiedExact?: boolean
 }
 
 
@@ -193,13 +199,20 @@ export async function recordWitness(
     return { recorded: true, recordSize: result.size, witnessId: ins.meta.last_row_id as number }
   }
   const row = await env.DB.prepare(
-    'SELECT id, size FROM witnesses WHERE n = ? ORDER BY size DESC LIMIT 1',
+    'SELECT id, size, elements FROM witnesses WHERE n = ? ORDER BY size DESC LIMIT 1',
   )
     .bind(result.N)
-    .first<{ id: number; size: number }>()
-  return {
+    .first<{ id: number; size: number; elements: string }>()
+  const status: RecordStatus = {
     recorded: false,
     recordSize: row?.size ?? result.size,
     witnessId: row?.id ?? 0,
   }
+  // On a tie, distinguish "resubmitted the record itself" from "a different
+  // set of the same size". Both are stored sorted and reduced mod n, so
+  // element-for-element equality is a string comparison.
+  if (row && row.size === result.size) {
+    status.tiedExact = row.elements === JSON.stringify(result.elements)
+  }
+  return status
 }
