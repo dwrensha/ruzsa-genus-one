@@ -1,5 +1,13 @@
 import { Hono } from 'hono'
-import { apiDocsPage, landingPage, notFoundPage, profilePage } from './pages'
+import {
+  activityPage,
+  apiDocsPage,
+  commentaryHistoryPage,
+  landingPage,
+  notFoundPage,
+  profilePage,
+  witnessDetailPage,
+} from './pages'
 import {
   type AppEnv,
   generateApiToken,
@@ -11,8 +19,13 @@ import {
   updateSessionUser,
 } from './auth'
 import {
+  COMMENT_MAX,
+  commentaryHistory,
   currentRecords,
   listTokens,
+  loadWitness,
+  postCommentary,
+  recentActivity,
   recordWitness,
   userWitnesses,
   type RecordStatus,
@@ -42,6 +55,43 @@ app.get('/auth/:provider/callback', handleCallback)
 app.post('/auth/logout', logout)
 
 app.get('/api', (c) => c.html(apiDocsPage(c.get('user'))))
+
+app.get('/witness/:id', async (c) => {
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id)) return c.html(notFoundPage(c.get('user')), 404)
+  const loaded = await loadWitness(c.env, id)
+  if (!loaded) return c.html(notFoundPage(c.get('user')), 404)
+  return c.html(witnessDetailPage(loaded.witness, loaded.comment, c.get('user')))
+})
+
+app.post('/witness/:id/commentary', async (c) => {
+  const user = c.get('user')
+  if (!user) return c.redirect('/auth/github', 302)
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id)) return c.html(notFoundPage(user), 404)
+  const exists = await c.env.DB.prepare('SELECT id FROM witnesses WHERE id = ?').bind(id).first()
+  if (!exists) return c.html(notFoundPage(user), 404)
+  const form = await c.req.parseBody()
+  const content = (typeof form.content === 'string' ? form.content : '').slice(0, COMMENT_MAX)
+  await postCommentary(c.env, id, user.id, content)
+  return c.redirect(`/witness/${id}`, 302)
+})
+
+app.get('/witness/:id/commentary-history', async (c) => {
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id)) return c.html(notFoundPage(c.get('user')), 404)
+  const loaded = await loadWitness(c.env, id)
+  if (!loaded) return c.html(notFoundPage(c.get('user')), 404)
+  return c.html(
+    commentaryHistoryPage(loaded.witness, await commentaryHistory(c.env, id), c.get('user')),
+  )
+})
+
+app.get('/recent', async (c) => {
+  const p = Math.max(0, Math.floor(Number(c.req.query('p')) || 0))
+  const { items, page, hasOlder } = await recentActivity(c.env, p)
+  return c.html(activityPage(items, page, hasOlder, c.get('user')))
+})
 
 app.get('/profile', async (c) => {
   const user = c.get('user')

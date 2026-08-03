@@ -5,7 +5,13 @@ import {
   MAX_SET_SIZE,
   type VerifyResult,
 } from './verify'
-import type { RecordStatus } from './store'
+import type {
+  ActivityItem,
+  CommentView,
+  RecordStatus,
+  WitnessView,
+} from './store'
+import { COMMENT_MAX } from './store'
 
 export interface User {
   id: number
@@ -25,6 +31,7 @@ export interface TokenRow {
 }
 
 export interface UserWitnessRow {
+  id: number
   n: number
   size: number
   ratio: number
@@ -82,6 +89,10 @@ export function layout(title: string, bodyInner: string, user: User | null = nul
     <main>${bodyInner}</main>
     <footer>
       <div class="inner">
+        <nav class="footer-links">
+          <a href="/recent">recent activity</a> &nbsp;&middot;&nbsp;
+          <a href="/api">API</a>
+        </nav>
         <p>Verification runs server-side in O(|A|&sup2;) time.
            Limits: N &le; ${MAX_N.toLocaleString('en-US')}, |A| &le; ${MAX_SET_SIZE.toLocaleString('en-US')}.</p>
       </div>
@@ -118,8 +129,9 @@ export interface FormState {
   elementsValue?: string
 }
 
-/** A current record: the modulus and its best witness size. */
+/** A current record: the witness row id, the modulus, and its best size. */
 export interface RecordPoint {
+  id: number
   n: number
   size: number
 }
@@ -161,11 +173,11 @@ function witnessPlot(pts: RecordPoint[]): string {
     .map((p) => {
       const ratio = p.size / Math.sqrt(p.n)
       const beats = ratio > 1
-      return `<circle class="dot${beats ? ' beats-sqrt' : ''}" cx="${X(Math.log10(p.n)).toFixed(1)}" cy="${Y(
-        Math.log10(p.size),
-      ).toFixed(1)}" r="${beats ? 6 : 4.5}"><title>N = ${p.n.toLocaleString('en-US')}: record |A| = ${p.size.toLocaleString(
+      return `<a href="/witness/${p.id}"><circle class="dot${beats ? ' beats-sqrt' : ''}" cx="${X(
+        Math.log10(p.n),
+      ).toFixed(1)}" cy="${Y(Math.log10(p.size)).toFixed(1)}" r="${beats ? 6 : 4.5}"><title>N = ${p.n.toLocaleString(
         'en-US',
-      )} (score ${(ratio).toFixed(4)})</title></circle>`
+      )}: record |A| = ${p.size.toLocaleString('en-US')} (score ${(ratio).toFixed(4)})</title></circle></a>`
     })
     .join('\n      ')
 
@@ -218,15 +230,19 @@ function fmtRatio(r: number): string {
 function recordSection(size: number, N: number, record?: RecordStatus): string {
   if (!record) return ''
   const nStr = N.toLocaleString('en-US')
+  const recordLink = (text: string) =>
+    record.witnessId ? `<a href="/witness/${record.witnessId}">${text}</a>` : text
   if (record.recorded) {
-    return `<p class="record-new">New record: the largest known witness for N = ${nStr}. Saved.</p>`
+    return `<p class="record-new">New record: the largest known witness for N = ${nStr}. Saved as ${recordLink(
+      `witness #${record.witnessId}`,
+    )}.</p>`
   }
   if (record.recordSize === size) {
-    return `<p class="muted">Ties the current record for N = ${nStr} (|A| = ${record.recordSize.toLocaleString(
+    return `<p class="muted">Ties the ${recordLink('current record')} for N = ${nStr} (|A| = ${record.recordSize.toLocaleString(
       'en-US',
     )}), which stands.</p>`
   }
-  return `<p class="muted">The record witness for N = ${nStr} has |A| = ${record.recordSize.toLocaleString(
+  return `<p class="muted">The ${recordLink('record witness')} for N = ${nStr} has |A| = ${record.recordSize.toLocaleString(
     'en-US',
   )}, so this one was not saved.</p>`
 }
@@ -313,7 +329,7 @@ function userWitnessesSection(rows: UserWitnessRow[]): string {
   const trs = rows
     .map(
       (w) => `<tr>
-        <td class="num">${w.n.toLocaleString('en-US')}</td>
+        <td class="num"><a href="/witness/${w.id}">${w.n.toLocaleString('en-US')}</a></td>
         <td class="num">${w.size.toLocaleString('en-US')}</td>
         <td class="num">${w.ratio.toFixed(4)}</td>
         <td>${escapeHtml(w.created_at)}</td>
@@ -441,6 +457,164 @@ export function apiDocsPage(user: User | null = null): string {
       <pre><code>${escapeHtml(invalidResp)}</code></pre>
     </section>`
   return layout(`API — ${SITE_NAME}`, body, user)
+}
+
+// Linkify `witness#123` references in commentary text; everything else is escaped.
+function renderCommentary(content: string): string {
+  let out = ''
+  let last = 0
+  for (const m of content.matchAll(/witness#(\d+)/g)) {
+    out += escapeHtml(content.slice(last, m.index))
+    out += `<a href="/witness/${m[1]}">witness#${m[1]}</a>`
+    last = (m.index ?? 0) + m[0].length
+  }
+  return out + escapeHtml(content.slice(last))
+}
+
+function commentarySection(witnessId: number, comment: CommentView | null, user: User | null): string {
+  const hasContent = !!comment && comment.content.length > 0
+  const body = hasContent
+    ? `<div class="comment-body">${renderCommentary(comment!.content)}</div>`
+    : `<p class="muted">No commentary yet.</p>`
+  const meta = comment
+    ? `<p class="comment-meta">last edited ${comment.author ? `by ${escapeHtml(comment.author)} ` : ''}at ${escapeHtml(
+        comment.created_at,
+      )} &middot; <a href="/witness/${witnessId}/commentary-history">history</a></p>`
+    : ''
+  const editor = user
+    ? `<details class="comment-edit">
+        <summary>edit</summary>
+        <form method="post" action="/witness/${witnessId}/commentary">
+          <textarea name="content" rows="6" maxlength="${COMMENT_MAX}">${escapeHtml(comment?.content ?? '')}</textarea>
+          <div><button type="submit">save</button> <span class="muted">submit empty to clear</span></div>
+        </form>
+      </details>`
+    : `<p class="muted"><a href="/auth/github">Log in</a> to add commentary.</p>`
+  return `<section class="comment-section">
+      <h3>Commentary</h3>
+      ${body}
+      ${meta}
+      ${editor}
+    </section>`
+}
+
+export function witnessDetailPage(
+  w: WitnessView,
+  comment: CommentView | null = null,
+  user: User | null = null,
+): string {
+  let elements: number[] = []
+  try {
+    elements = JSON.parse(w.elements)
+  } catch {
+    /* leave empty */
+  }
+  const submitter = w.submitter_name
+    ? escapeHtml(w.submitter_name)
+    : '<span class="muted">anonymous</span>'
+  const isCurrent = w.size === w.record_size
+  const status = isCurrent
+    ? 'current record for this modulus'
+    : `superseded &mdash; the record is now |A| = ${w.record_size.toLocaleString('en-US')}`
+  const body = `
+    <section class="prose">
+      <p class="page-nav"><a href="/">&larr; home</a> &nbsp;&middot;&nbsp; <a href="/recent">recent activity</a></p>
+      <h2>witness #${w.id}</h2>
+      <dl class="stats">
+        <div><dt>N</dt><dd>${w.n.toLocaleString('en-US')}</dd></div>
+        <div><dt>|A|</dt><dd>${w.size.toLocaleString('en-US')}</dd></div>
+        <div><dt>score |A|/&radic;<span class="sqrt">N</span></dt><dd class="score">${w.ratio.toFixed(4)}</dd></div>
+      </dl>
+      <dl class="witness-meta">
+        <dt>status</dt><dd>${status}</dd>
+        <dt>submitted by</dt><dd>${submitter}</dd>
+        <dt>submitted at</dt><dd>${escapeHtml(w.created_at)}</dd>
+      </dl>
+      <section class="witness-elements">
+        <h3>Elements <span class="muted">(${elements.length.toLocaleString('en-US')})</span></h3>
+        <pre class="elements">${elements.join(', ')}</pre>
+      </section>
+      ${commentarySection(w.id, comment, user)}
+    </section>`
+  return layout(`witness #${w.id} — ${SITE_NAME}`, body, user)
+}
+
+export function commentaryHistoryPage(
+  w: WitnessView,
+  entries: CommentView[],
+  user: User | null = null,
+): string {
+  const list = entries.length
+    ? entries
+        .map(
+          (e) => `<li>
+        <p class="comment-meta">${e.author ? escapeHtml(e.author) : '<span class="muted">(deleted user)</span>'} &middot; ${escapeHtml(
+            e.created_at,
+          )}</p>
+        ${e.content.length > 0 ? `<div class="comment-body">${renderCommentary(e.content)}</div>` : `<p class="muted">(cleared)</p>`}
+      </li>`,
+        )
+        .join('\n')
+    : `<li class="muted">No commentary yet.</li>`
+  const body = `
+    <section class="prose">
+      <p class="page-nav"><a href="/witness/${w.id}">&larr; witness #${w.id}</a></p>
+      <h2>Commentary history</h2>
+      <p class="muted">${entries.length} edit${entries.length === 1 ? '' : 's'}.</p>
+      <ul class="comment-history">${list}</ul>
+    </section>`
+  return layout(`Commentary history — ${SITE_NAME}`, body, user)
+}
+
+function clip(s: string, n: number): string {
+  return s.length > n ? s.slice(0, n) + '…' : s
+}
+
+// Recent-activity feed: record witnesses and commentary edits, newest first.
+export function activityPage(
+  items: ActivityItem[],
+  page: number,
+  hasOlder: boolean,
+  user: User | null = null,
+): string {
+  const who = (u: string | null) => (u ? escapeHtml(u) : '<span class="muted">anonymous</span>')
+  const entry = (a: ActivityItem): string => {
+    const link = `<a href="/witness/${a.witness_id}">witness #${a.witness_id}</a>`
+    const meta = `<p class="activity-meta">${escapeHtml(a.ts)} &middot; ${who(a.user)}</p>`
+    if (a.kind === 'record') {
+      return `<li>
+        ${meta}
+        <p class="activity-line">set a record for N = ${a.n.toLocaleString('en-US')} with ${link} &mdash; |A| = ${a.size.toLocaleString(
+          'en-US',
+        )}, score ${a.ratio.toFixed(4)}</p>
+      </li>`
+    }
+    const cleared = !a.content || a.content.length === 0
+    return `<li>
+        ${meta}
+        <p class="activity-line">${cleared ? `cleared commentary on ${link}` : `edited commentary on ${link}`}</p>
+        ${cleared ? '' : `<div class="comment-body">${renderCommentary(clip(a.content!, 280))}</div>`}
+      </li>`
+  }
+  const list = items.length
+    ? `<ul class="activity">${items.map(entry).join('\n')}</ul>`
+    : `<p class="muted">No activity yet.</p>`
+  const newer =
+    page > 0
+      ? `<a href="/recent${page - 1 === 0 ? '' : `?p=${page - 1}`}">&larr; newer</a>`
+      : `<span class="muted">&larr; newer</span>`
+  const older = hasOlder
+    ? `<a href="/recent?p=${page + 1}">older &rarr;</a>`
+    : `<span class="muted">older &rarr;</span>`
+  const body = `
+    <section class="prose">
+      <p class="page-nav"><a href="/">&larr; home</a></p>
+      <h2>Recent activity</h2>
+      <p class="muted">Record witnesses and commentary edits, newest first.</p>
+      ${list}
+      <nav class="pager">${newer} <span class="muted">page ${page + 1}</span> ${older}</nav>
+    </section>`
+  return layout(`Recent activity — ${SITE_NAME}`, body, user)
 }
 
 export function notFoundPage(user: User | null = null): string {

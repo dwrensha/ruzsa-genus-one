@@ -312,6 +312,143 @@ var {
   margin-top: 2rem;
 }
 
+/* Witness pages, commentary, recent activity */
+
+.records-plot a .dot {
+  cursor: pointer;
+}
+
+.records-plot a:hover .dot {
+  fill: #ffd267;
+  r: 7;
+}
+
+.witness-meta {
+  margin: 1rem 0;
+}
+
+.witness-meta dt {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-top: 0.6rem;
+}
+
+.witness-meta dd {
+  margin: 0.1rem 0 0;
+}
+
+.elements {
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  max-height: 16rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.9rem;
+}
+
+.comment-section {
+  margin-top: 2rem;
+}
+
+.comment-body {
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.comment-meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0.4rem 0;
+}
+
+.comment-edit {
+  margin-top: 0.5rem;
+}
+
+.comment-edit summary {
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.comment-edit textarea {
+  margin-top: 0.5rem;
+}
+
+.comment-edit button {
+  margin-top: 0.6rem;
+}
+
+.comment-history {
+  list-style: none;
+  padding: 0;
+}
+
+.comment-history li {
+  border-bottom: 1px solid var(--panel-edge);
+  padding: 0.9rem 0;
+}
+
+.activity {
+  list-style: none;
+  padding: 0;
+}
+
+.activity li {
+  border-bottom: 1px solid var(--panel-edge);
+  padding: 0.8rem 0;
+}
+
+.activity-meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0 0 0.2rem;
+}
+
+.activity-line {
+  margin: 0;
+}
+
+.activity .comment-body {
+  margin-top: 0.5rem;
+  font-size: 0.92rem;
+}
+
+.pager {
+  display: flex;
+  justify-content: space-between;
+  margin: 1.5rem 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.pager a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.pager a:hover {
+  text-decoration: underline;
+}
+
+.footer-links {
+  margin-bottom: 0.5rem;
+}
+
+.footer-links a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.footer-links a:hover {
+  color: var(--accent);
+}
+
 .display-eq {
   text-align: center;
   font-size: 1.25rem;
