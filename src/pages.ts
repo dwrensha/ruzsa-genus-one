@@ -165,8 +165,11 @@ function witnessPlot(pts: RecordPoint[]): string {
   }
 
   // Guide line: the sqrt(N) barrier (log r = log N / 2), corner to corner.
+  // Its label runs along the line, nudged perpendicular so it doesn't overlap.
+  const lineAngle = (Math.atan2(-plotH, plotW) * 180) / Math.PI
+  const labelX = L + 0.85 * plotW, labelY = T + 0.15 * plotH
   const sqrtLine = `<line class="guide guide-sqrt" x1="${X(0)}" y1="${Y(0)}" x2="${X(xmax).toFixed(1)}" y2="${Y(xmax / 2).toFixed(1)}"/>
-      <text class="guide-label" x="${(X(xmax) - 8).toFixed(1)}" y="${(Y(xmax / 2) + 16).toFixed(1)}" text-anchor="end">r = &#8730;N</text>`
+      <text class="guide-label" transform="rotate(${lineAngle.toFixed(1)} ${labelX.toFixed(1)} ${labelY.toFixed(1)})" x="${labelX.toFixed(1)}" y="${labelY.toFixed(1)}" dy="-7" text-anchor="end">r = &#8730;N</text>`
 
   const dots = pts
     .map((p) => {
