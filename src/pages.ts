@@ -49,7 +49,7 @@ export function escapeHtml(s: unknown): string {
     .replace(/'/g, '&#39;')
 }
 
-const SITE_NAME = 'a + 3b = 2c + 2d'
+const SITE_NAME = 'Ruzsa’s genus-one problem'
 const SITE_DESCRIPTION =
   "Ruzsa's genus-one equation: hunt for large subsets of Z/NZ with no " +
   'nontrivial solutions to a + 3b = 2c + 2d. Can you beat sqrt(N)?'
