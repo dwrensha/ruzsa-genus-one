@@ -204,7 +204,8 @@ function recordsSection(records: RecordPoint[]): string {
     <h2>Records</h2>
     ${inner}
     <p class="muted plot-caption">Each dot is the largest known witness for its modulus.
-    A dot above the dashed line beats &radic;<span class="sqrt">N</span>.</p>
+    A dot above the dashed line beats &radic;<span class="sqrt">N</span>.
+    <a href="/database.json" download>Download all records (JSON) &darr;</a></p>
   </section>`
 }
 
@@ -481,6 +482,13 @@ export function apiDocsPage(user: User | null = null): string {
       <p>An invalid set instead gets <code>valid: false</code> and one concrete nontrivial solution
       (no <code>record</code> field):</p>
       <pre><code>${escapeHtml(invalidResp)}</code></pre>
+
+      <h3>GET <code>/database.json</code></h3>
+      <p>All record witnesses as one JSON download: <code>{ count, witnesses }</code>, each with
+      its modulus <code>n</code>, <code>size</code>, <code>ratio</code>, full <code>elements</code>
+      list, <code>submitter</code>, <code>created_at</code>, and <code>current</code> (false for
+      superseded records, which are kept as history). No auth required. Responses carry a strong
+      <code>ETag</code>; conditional requests return <code>304</code> when nothing has changed.</p>
     </section>`
   return layout(`API — ${SITE_NAME}`, body, user)
 }

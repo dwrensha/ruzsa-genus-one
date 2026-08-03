@@ -63,6 +63,61 @@ app.post('/auth/logout', logout)
 
 app.get('/api', (c) => c.html(apiDocsPage(c.get('user'))))
 
+// A JSON attachment response with a strong ETag over the exact body, so
+// clients can revalidate cheaply. no-cache = clients may store but must
+// revalidate every time; paired with the ETag, a fresh request returns 304
+// (no body) when nothing changed — the body only changes when a record does.
+async function jsonDownload(req: Request, payload: string, filename: string): Promise<Response> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload))
+  const etag =
+    '"' +
+    [...new Uint8Array(digest)]
+      .slice(0, 16)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('') +
+    '"'
+  const headers = {
+    'content-type': 'application/json; charset=UTF-8',
+    'content-disposition': `attachment; filename="${filename}"`,
+    'cache-control': 'no-cache',
+    etag,
+  }
+  if (req.headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers })
+  return new Response(payload, { status: 200, headers })
+}
+
+// Every record witness (current and superseded) as one JSON download.
+app.get('/database.json', async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT w.id, w.n, w.size, w.ratio, w.elements, w.created_at,
+            u.display_name AS submitter,
+            (w.size = (SELECT MAX(size) FROM witnesses WHERE n = w.n)) AS is_current
+       FROM witnesses w LEFT JOIN users u ON u.id = w.submitter_user_id
+       ORDER BY w.n, w.size`,
+  ).all<{
+    id: number
+    n: number
+    size: number
+    ratio: number
+    elements: string
+    created_at: string
+    submitter: string | null
+    is_current: number
+  }>()
+  const witnesses = results.map((r) => ({
+    id: r.id,
+    n: r.n,
+    size: r.size,
+    ratio: r.ratio,
+    elements: JSON.parse(r.elements) as number[],
+    submitter: r.submitter,
+    created_at: r.created_at,
+    current: !!r.is_current,
+  }))
+  const payload = JSON.stringify({ count: witnesses.length, witnesses }, null, 2)
+  return jsonDownload(c.req.raw, payload, 'ruzsa-genus-one-records.json')
+})
+
 app.get('/acknowledge', (c) => c.html(acknowledgePage(c.get('user'))))
 
 app.get('/witness/:id', async (c) => {
