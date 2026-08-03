@@ -55,13 +55,6 @@ header .inner {
   flex-wrap: wrap;
 }
 
-header .title-group {
-  display: flex;
-  align-items: baseline;
-  gap: 0.8rem;
-  flex-wrap: wrap;
-}
-
 header h1 {
   margin: 0;
   font-size: 1.5rem;
@@ -76,12 +69,6 @@ header h1 a {
 
 header h1 a:hover {
   color: #ffd267;
-}
-
-header .tagline {
-  color: var(--muted);
-  font-size: 0.95rem;
-  font-style: italic;
 }
 
 header nav .auth-nav {
