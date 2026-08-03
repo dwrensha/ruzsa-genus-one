@@ -174,11 +174,16 @@ function witnessPlot(pts: RecordPoint[]): string {
     .map((p) => {
       const ratio = p.size / Math.sqrt(p.n)
       const beats = ratio > 1
-      return `<a href="/witness/${p.id}"><circle class="dot${beats ? ' beats-sqrt' : ''}" cx="${X(
-        Math.log10(p.n),
-      ).toFixed(1)}" cy="${Y(Math.log10(p.size)).toFixed(1)}" r="${beats ? 6 : 4.5}"><title>N = ${p.n.toLocaleString(
-        'en-US',
-      )}: record |A| = ${p.size.toLocaleString('en-US')} (score ${(ratio).toFixed(4)})</title></circle></a>`
+      const x = X(Math.log10(p.n))
+      const y = Y(Math.log10(p.size))
+      const label = `N = ${p.n.toLocaleString('en-US')}, |A| = ${p.size.toLocaleString('en-US')}, score ${ratio.toFixed(4)}`
+      // Instant hover label (shown via CSS), kept inside the frame; the native
+      // <title> tooltip stays for accessibility.
+      const lx = Math.min(Math.max(x, L + 90), W - R - 90).toFixed(1)
+      const ly = (y < T + 28 ? y + 24 : y - 14).toFixed(1)
+      return `<a href="/witness/${p.id}"><circle class="dot${beats ? ' beats-sqrt' : ''}" cx="${x.toFixed(
+        1,
+      )}" cy="${y.toFixed(1)}" r="${beats ? 6 : 4.5}"><title>${label}</title></circle><text class="dot-tip" x="${lx}" y="${ly}" text-anchor="middle">${label}</text></a>`
     })
     .join('\n      ')
 
