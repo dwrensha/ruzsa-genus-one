@@ -441,6 +441,19 @@ var {
   color: var(--accent);
 }
 
+/* Outbound links get a small external-link glyph, colored to match. */
+a.external::after {
+  content: "";
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  margin-left: 0.25em;
+  background-color: currentColor;
+  opacity: 0.6;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M6 1h5v5L8.86 3.85 4.7 8 4 7.3l4.15-4.15zM2 3h2v1H3v6h6V8h1v3H2z'/></svg>") no-repeat center / contain;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M6 1h5v5L8.86 3.85 4.7 8 4 7.3l4.15-4.15zM2 3h2v1H3v6h6V8h1v3H2z'/></svg>") no-repeat center / contain;
+}
+
 .display-eq {
   text-align: center;
   font-size: 1.25rem;
