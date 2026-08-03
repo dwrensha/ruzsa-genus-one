@@ -89,8 +89,13 @@ export function layout(title: string, bodyInner: string, user: User | null = nul
         <nav class="footer-links">
           <a href="/recent">recent activity</a> &nbsp;&middot;&nbsp;
           <a href="/api">API</a> &nbsp;&middot;&nbsp;
-          <a class="external" href="https://github.com/dwrensha/ruzsa-genus-one">source</a>
+          <a class="external" href="https://github.com/dwrensha/ruzsa-genus-one">source</a> &nbsp;&middot;&nbsp;
+          <a class="external" href="https://icarm.io">icarm.io</a>
         </nav>
+        <p class="acknowledgment">This website is maintained by the NSF Institute for Computer-Aided
+        Reasoning in Mathematics <span class="nowrap">(<a class="external" href="https://icarm.io">ICARM</a>)</span>.
+        Please <a href="/acknowledge">acknowledge</a> ICARM and NSF Grant DMS 2425401 in related
+        publications, projects, or other scholarly work.</p>
       </div>
     </footer>
   </body>
@@ -613,6 +618,29 @@ export function activityPage(
       <nav class="pager">${newer} <span class="muted">page ${page + 1}</span> ${older}</nav>
     </section>`
   return layout(`Recent activity — ${SITE_NAME}`, body, user)
+}
+
+export function acknowledgePage(user: User | null = null): string {
+  const body = `
+    <section class="prose">
+      <p class="page-nav"><a href="/">&larr; home</a></p>
+      <h2>Acknowledgement</h2>
+      <p>The Institute for Computer-Aided Reasoning in Mathematics
+      <span class="nowrap">(<a class="external" href="https://icarm.io">ICARM</a>)</span> is supported by
+      U.S. National Science Foundation Grant DMS 2425401. The views expressed on these pages do not
+      necessarily reflect those of the NSF.</p>
+      <p>If any ICARM meetings, resources, or innovation engineers are helpful to you, you can indicate
+      that in associated publications with a brief acknowledgment, such as the following:</p>
+      <ul>
+        <li>&ldquo;Part of this research has been carried out at the Institute for Computer-Aided
+        Reasoning (ICARM), which is supported by NSF Grant DMS 2425401.&rdquo;</li>
+        <li>&ldquo;This research made use of the Ruzsa genus-one problem site, maintained by the
+        Institute for Computer-Aided Reasoning (ICARM) under NSF Grant DMS 2425401.&rdquo;</li>
+        <li>&ldquo;We are grateful to the Institute for Computer-Aided Reasoning (ICARM) for technical
+        support provided under NSF Grant DMS 2425401.&rdquo;</li>
+      </ul>
+    </section>`
+  return layout(`Acknowledgement — ${SITE_NAME}`, body, user)
 }
 
 export function notFoundPage(user: User | null = null): string {

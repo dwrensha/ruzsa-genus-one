@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import {
+  acknowledgePage,
   activityPage,
   apiDocsPage,
   commentaryHistoryPage,
@@ -55,6 +56,8 @@ app.get('/auth/:provider/callback', handleCallback)
 app.post('/auth/logout', logout)
 
 app.get('/api', (c) => c.html(apiDocsPage(c.get('user'))))
+
+app.get('/acknowledge', (c) => c.html(acknowledgePage(c.get('user'))))
 
 app.get('/witness/:id', async (c) => {
   const id = Number(c.req.param('id'))
