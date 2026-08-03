@@ -184,7 +184,7 @@ function witnessPlot(pts: RecordPoint[]): string {
 function recordsSection(records: RecordPoint[]): string {
   const inner =
     records.length === 0
-      ? '<p class="muted">No record witnesses yet &mdash; verify a valid set to put the first dot on the board.</p>'
+      ? '<p class="muted">No record witnesses yet &mdash; submit a valid set to put the first dot on the board.</p>'
       : witnessPlot(records)
   return `
   <section class="panel records">
@@ -198,7 +198,7 @@ function recordsSection(records: RecordPoint[]): string {
 function verifierForm(state: FormState): string {
   return `
   <section class="panel">
-    <h2>Verify a witness</h2>
+    <h2>Submit a witness</h2>
     <form method="post" action="/verify">
       <label for="N">Modulus <var>N</var></label>
       <input id="N" name="N" type="text" inputmode="numeric" required
@@ -307,7 +307,7 @@ function userWitnessesSection(rows: UserWitnessRow[]): string {
   if (rows.length === 0) {
     return `<section class="my-witnesses">
       ${heading}
-      <p class="muted">None yet &mdash; a witness is saved here when it sets the record for its modulus. <a href="/">Verify one &rarr;</a></p>
+      <p class="muted">None yet &mdash; a witness is saved here when it sets the record for its modulus. <a href="/">Submit one &rarr;</a></p>
     </section>`
   }
   const trs = rows
