@@ -7,6 +7,7 @@ import {
   handleCallback,
   logout,
 } from './auth'
+import { currentRecords, recordWitness, type RecordStatus } from './store'
 import {
   MAX_ELEMENTS_TEXT_BYTES,
   MAX_SET_SIZE,
@@ -24,7 +25,7 @@ app.use('*', async (c, next) => {
   await next()
 })
 
-app.get('/', (c) => c.html(landingPage(c.get('user'))))
+app.get('/', async (c) => c.html(landingPage(c.get('user'), undefined, {}, undefined, await currentRecords(c.env))))
 
 app.get('/auth/:provider', startOAuth)
 app.get('/auth/:provider/callback', handleCallback)
@@ -51,8 +52,18 @@ app.post('/verify', async (c) => {
   const nText = typeof body.N === 'string' ? body.N : ''
   const elementsText = typeof body.A === 'string' ? body.A : ''
   const result = verifyFromText(nText, elementsText)
+  let record: RecordStatus | undefined
+  if (result.ok && result.valid) {
+    record = await recordWitness(c.env, result, c.get('user')?.id ?? null)
+  }
   return c.html(
-    landingPage(c.get('user'), result, { nValue: nText, elementsValue: elementsText }),
+    landingPage(
+      c.get('user'),
+      result,
+      { nValue: nText, elementsValue: elementsText },
+      record,
+      await currentRecords(c.env),
+    ),
   )
 })
 
@@ -78,9 +89,13 @@ app.post('/api/verify', async (c) => {
   }
   const result = verify(N, A as number[])
   if (!result.ok) return c.json(result, 400)
+  let record: RecordStatus | undefined
+  if (result.valid) {
+    record = await recordWitness(c.env, result, c.get('user')?.id ?? null)
+  }
   // Echoing the (possibly large) element list back is redundant for API users.
   const { elements: _elements, ...rest } = result
-  return c.json(rest)
+  return c.json(record ? { ...rest, record } : rest)
 })
 
 app.notFound((c) => c.html(notFoundPage(c.get('user')), 404))

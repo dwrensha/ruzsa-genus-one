@@ -5,6 +5,7 @@ import {
   MAX_SET_SIZE,
   type VerifyResult,
 } from './verify'
+import type { RecordStatus } from './store'
 
 export interface User {
   id: number
@@ -100,6 +101,83 @@ export interface FormState {
   elementsValue?: string
 }
 
+/** A current record: the modulus and its best witness size. */
+export interface RecordPoint {
+  n: number
+  size: number
+}
+
+// Server-rendered log-log SVG scatter of record witness sizes r(N) against the
+// modulus N. Fixed frame spanning the whole allowed range, so the r = sqrt(N)
+// goal line always reads the same. No JS; tooltips via <title>.
+function witnessPlot(pts: RecordPoint[]): string {
+  const W = 720, H = 440, L = 56, R = 18, T = 18, B = 46
+  const plotW = W - L - R, plotH = H - T - B
+  const xmax = Math.log10(MAX_N)       // ~7.7
+  const ymax = Math.log10(MAX_SET_SIZE) // ~4.3
+  const X = (logN: number) => L + (logN / xmax) * plotW
+  const Y = (logR: number) => T + plotH - (logR / ymax) * plotH
+
+  // Decade gridlines and ticks; labels as powers of ten.
+  const pow10 = (k: number): string =>
+    k === 0 ? '1' : `10<tspan class="sup" dy="-5">${k}</tspan><tspan dy="5">&#8203;</tspan>`
+  let grid = ''
+  for (let k = 0; k <= Math.floor(xmax); k++) {
+    const x = X(k).toFixed(1)
+    if (k > 0) grid += `<line class="grid" x1="${x}" y1="${T}" x2="${x}" y2="${T + plotH}"/>`
+    grid += `<text class="tick" x="${x}" y="${T + plotH + 18}" text-anchor="middle">${pow10(k)}</text>`
+  }
+  for (let k = 0; k <= Math.floor(ymax); k++) {
+    const y = Y(k).toFixed(1)
+    if (k > 0) grid += `<line class="grid" x1="${L}" y1="${y}" x2="${W - R}" y2="${y}"/>`
+    grid += `<text class="tick" x="${L - 8}" y="${(Y(k) + 4).toFixed(1)}" text-anchor="end">${pow10(k)}</text>`
+  }
+
+  // Guide lines: the sqrt(N) barrier (log r = log N / 2) and the trivial
+  // bound r = N (clipped at the top of the frame).
+  const sqrtLine = `<line class="guide guide-sqrt" x1="${X(0)}" y1="${Y(0)}" x2="${X(xmax).toFixed(1)}" y2="${Y(xmax / 2).toFixed(1)}"/>
+      <text class="guide-label" x="${(X(xmax) - 8).toFixed(1)}" y="${(Y(xmax / 2) - 8).toFixed(1)}" text-anchor="end">r = &#8730;N</text>`
+  const nLine = `<line class="guide guide-n" x1="${X(0)}" y1="${Y(0)}" x2="${X(ymax).toFixed(1)}" y2="${Y(ymax).toFixed(1)}"/>
+      <text class="guide-label" x="${(X(ymax) + 10).toFixed(1)}" y="${(Y(ymax) + 4).toFixed(1)}">r = N</text>`
+
+  const dots = pts
+    .map((p) => {
+      const ratio = p.size / Math.sqrt(p.n)
+      const beats = ratio > 1
+      return `<circle class="dot${beats ? ' beats-sqrt' : ''}" cx="${X(Math.log10(p.n)).toFixed(1)}" cy="${Y(
+        Math.log10(p.size),
+      ).toFixed(1)}" r="${beats ? 6 : 4.5}"><title>N = ${p.n.toLocaleString('en-US')}: record |A| = ${p.size.toLocaleString(
+        'en-US',
+      )} (score ${(ratio).toFixed(4)})</title></circle>`
+    })
+    .join('\n      ')
+
+  return `<svg class="records-plot" viewBox="0 0 ${W} ${H}" role="img" aria-label="record witness size versus modulus, log-log scatter plot">
+      ${grid}
+      ${nLine}
+      ${sqrtLine}
+      <line class="axis" x1="${L}" y1="${T}" x2="${L}" y2="${T + plotH}"/>
+      <line class="axis" x1="${L}" y1="${T + plotH}" x2="${W - R}" y2="${T + plotH}"/>
+      <text class="axis-title" x="${L + plotW / 2}" y="${H - 6}" text-anchor="middle">modulus N &#8594;</text>
+      <text class="axis-title" transform="rotate(-90)" x="${-(T + plotH / 2)}" y="15" text-anchor="middle">record witness size r(N) &#8594;</text>
+      ${dots}
+    </svg>`
+}
+
+function recordsSection(records: RecordPoint[]): string {
+  const inner =
+    records.length === 0
+      ? '<p class="muted">No record witnesses yet &mdash; verify a valid set to put the first dot on the board.</p>'
+      : witnessPlot(records)
+  return `
+  <section class="panel records">
+    <h2>Records</h2>
+    ${inner}
+    <p class="muted plot-caption">Each dot is the largest known witness for its modulus.
+    A dot above the dashed line beats &radic;<span class="sqrt">N</span>.</p>
+  </section>`
+}
+
 function verifierForm(state: FormState): string {
   return `
   <section class="panel">
@@ -120,7 +198,23 @@ function fmtRatio(r: number): string {
   return r.toFixed(4)
 }
 
-function resultSection(result: VerifyResult): string {
+function recordSection(size: number, N: number, record?: RecordStatus): string {
+  if (!record) return ''
+  const nStr = N.toLocaleString('en-US')
+  if (record.recorded) {
+    return `<p class="record-new">New record: the largest known witness for N = ${nStr}. Saved.</p>`
+  }
+  if (record.recordSize === size) {
+    return `<p class="muted">Ties the current record for N = ${nStr} (|A| = ${record.recordSize.toLocaleString(
+      'en-US',
+    )}), which stands.</p>`
+  }
+  return `<p class="muted">The record witness for N = ${nStr} has |A| = ${record.recordSize.toLocaleString(
+    'en-US',
+  )}, so this one was not saved.</p>`
+}
+
+function resultSection(result: VerifyResult, record?: RecordStatus): string {
   if (!result.ok) {
     return `
     <section class="result result-error">
@@ -145,6 +239,7 @@ function resultSection(result: VerifyResult): string {
         'en-US',
       )})</span> in this set.</p>
       ${stats}
+      ${recordSection(result.size, result.N, record)}
       ${
         beats
           ? '<p class="beats">This witness beats &radic;<span class="sqrt">N</span>! 🏆</p>'
@@ -171,10 +266,13 @@ export function landingPage(
   user: User | null = null,
   result?: VerifyResult,
   form: FormState = {},
+  record?: RecordStatus,
+  records: RecordPoint[] = [],
 ): string {
   const body = `
     ${problemStatement()}
-    ${result ? resultSection(result) : ''}
+    ${result ? resultSection(result, record) : ''}
+    ${recordsSection(records)}
     ${verifierForm(form)}
     <section class="prose api-note">
       <h2>API</h2>
