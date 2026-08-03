@@ -6,6 +6,14 @@ import {
   type VerifyResult,
 } from './verify'
 
+export interface User {
+  id: number
+  provider: string
+  email?: string | null
+  display_name?: string | null
+  avatar_url?: string | null
+}
+
 export function escapeHtml(s: unknown): string {
   if (s == null) return ''
   return String(s)
@@ -21,7 +29,18 @@ const SITE_DESCRIPTION =
   "Ruzsa's genus-one equation: hunt for large subsets of Z/NZ with no " +
   'nontrivial solutions to a + 3b = 2c + 2d. Can you beat sqrt(N)?'
 
-export function layout(title: string, bodyInner: string): string {
+function authNav(user: User | null): string {
+  if (user) {
+    const name = escapeHtml(user.display_name || user.email || 'user')
+    return (
+      `<span class="auth-user">${name}</span>` +
+      `<form class="auth-logout" method="post" action="/auth/logout"><button type="submit">log out</button></form>`
+    )
+  }
+  return `<a href="/auth/github">log in with GitHub</a>`
+}
+
+export function layout(title: string, bodyInner: string, user: User | null = null): string {
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -36,7 +55,7 @@ export function layout(title: string, bodyInner: string): string {
     <header>
       <div class="inner">
         <h1><a href="/"><span class="eq">a&#8202;+&#8202;3b&#8202;=&#8202;2c&#8202;+&#8202;2d</span></a></h1>
-        <nav><span class="tagline">Ruzsa&rsquo;s genus-one problem</span></nav>
+        <nav><span class="tagline">Ruzsa&rsquo;s genus-one problem</span><span class="auth-nav">${authNav(user)}</span></nav>
       </div>
     </header>
     <main>${bodyInner}</main>
@@ -145,7 +164,11 @@ function resultSection(result: VerifyResult): string {
   </section>`
 }
 
-export function landingPage(result?: VerifyResult, form: FormState = {}): string {
+export function landingPage(
+  user: User | null = null,
+  result?: VerifyResult,
+  form: FormState = {},
+): string {
   const body = `
     ${problemStatement()}
     ${result ? resultSection(result) : ''}
@@ -158,9 +181,9 @@ export function landingPage(result?: VerifyResult, form: FormState = {}): string
         as JSON.
       </p>
     </section>`
-  return layout(SITE_NAME, body)
+  return layout(SITE_NAME, body, user)
 }
 
-export function notFoundPage(): string {
-  return layout('Not found', `<section class="prose"><p>Page not found.</p></section>`)
+export function notFoundPage(user: User | null = null): string {
+  return layout('Not found', `<section class="prose"><p>Page not found.</p></section>`, user)
 }

@@ -9,6 +9,23 @@
   "assets": {
     "directory": "./public"
   },
+  // OAuth secrets are set via:
+  //   wrangler secret put GITHUB_CLIENT_ID
+  //   wrangler secret put GITHUB_CLIENT_SECRET
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ruzsa-genus-one",
+      "database_id": "4a58adce-c793-4b1f-9f73-5b8a9853090b",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "SESSIONS",
+      "id": "52f1acf868db4234a263d24c1cdc1667"
+    }
+  ],
   "observability": {
     "enabled": true
   }

@@ -1,6 +1,13 @@
 import { Hono } from 'hono'
 import { landingPage, notFoundPage } from './pages'
 import {
+  type AppEnv,
+  loadCurrentUser,
+  startOAuth,
+  handleCallback,
+  logout,
+} from './auth'
+import {
   MAX_ELEMENTS_TEXT_BYTES,
   MAX_SET_SIZE,
   parseElements,
@@ -8,9 +15,20 @@ import {
   type VerifyResult,
 } from './verify'
 
-const app = new Hono()
+const app = new Hono<AppEnv>()
 
-app.get('/', (c) => c.html(landingPage()))
+// Resolve the current user from the session cookie for every request; the
+// lookup short-circuits cheaply when the cookie is absent.
+app.use('*', async (c, next) => {
+  c.set('user', await loadCurrentUser(c))
+  await next()
+})
+
+app.get('/', (c) => c.html(landingPage(c.get('user'))))
+
+app.get('/auth/:provider', startOAuth)
+app.get('/auth/:provider/callback', handleCallback)
+app.post('/auth/logout', logout)
 
 function verifyFromText(nText: string, elementsText: string): VerifyResult {
   if (elementsText.length > MAX_ELEMENTS_TEXT_BYTES) {
@@ -33,7 +51,9 @@ app.post('/verify', async (c) => {
   const nText = typeof body.N === 'string' ? body.N : ''
   const elementsText = typeof body.A === 'string' ? body.A : ''
   const result = verifyFromText(nText, elementsText)
-  return c.html(landingPage(result, { nValue: nText, elementsValue: elementsText }))
+  return c.html(
+    landingPage(c.get('user'), result, { nValue: nText, elementsValue: elementsText }),
+  )
 })
 
 app.post('/api/verify', async (c) => {
@@ -63,6 +83,6 @@ app.post('/api/verify', async (c) => {
   return c.json(rest)
 })
 
-app.notFound((c) => c.html(notFoundPage(), 404))
+app.notFound((c) => c.html(notFoundPage(c.get('user')), 404))
 
 export default app

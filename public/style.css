@@ -77,6 +77,46 @@ header .tagline {
   font-style: italic;
 }
 
+header nav .auth-nav {
+  margin-left: 1rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+header nav .auth-nav a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+header nav .auth-nav a:hover {
+  color: var(--accent);
+}
+
+.auth-user {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.auth-logout {
+  display: inline;
+  margin-left: 0.6rem;
+}
+
+.auth-logout button {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.auth-logout button:hover {
+  color: var(--accent);
+}
+
 main {
   max-width: 780px;
   margin: 0 auto;
