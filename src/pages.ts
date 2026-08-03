@@ -88,7 +88,8 @@ export function layout(title: string, bodyInner: string, user: User | null = nul
       <div class="inner">
         <nav class="footer-links">
           <a href="/recent">recent activity</a> &nbsp;&middot;&nbsp;
-          <a href="/api">API</a>
+          <a href="/api">API</a> &nbsp;&middot;&nbsp;
+          <a class="external" href="https://github.com/dwrensha/ruzsa-genus-one">source</a>
         </nav>
       </div>
     </footer>
