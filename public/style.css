@@ -183,7 +183,6 @@ var {
 }
 .records-plot .guide { stroke-dasharray: 6 5; fill: none; }
 .records-plot .guide-sqrt { stroke: var(--accent-dim); stroke-width: 1.8; }
-.records-plot .guide-n { stroke: var(--panel-edge); stroke-width: 1.5; }
 .records-plot .guide-label {
   fill: var(--muted);
   font-size: 12px;

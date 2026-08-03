@@ -143,8 +143,9 @@ export interface RecordPoint {
 function witnessPlot(pts: RecordPoint[]): string {
   const W = 720, H = 440, L = 56, R = 18, T = 18, B = 46
   const plotW = W - L - R, plotH = H - T - B
-  const xmax = Math.log10(MAX_N)       // ~7.7
-  const ymax = Math.log10(MAX_SET_SIZE) // ~4.3
+  const xmax = Math.log10(MAX_N) // ~4.7
+  // Scale y so the sqrt(N) goal line runs corner to corner.
+  const ymax = xmax / 2
   const X = (logN: number) => L + (logN / xmax) * plotW
   const Y = (logR: number) => T + plotH - (logR / ymax) * plotH
 
@@ -163,12 +164,9 @@ function witnessPlot(pts: RecordPoint[]): string {
     grid += `<text class="tick" x="${L - 8}" y="${(Y(k) + 4).toFixed(1)}" text-anchor="end">${pow10(k)}</text>`
   }
 
-  // Guide lines: the sqrt(N) barrier (log r = log N / 2) and the trivial
-  // bound r = N (clipped at the top of the frame).
+  // Guide line: the sqrt(N) barrier (log r = log N / 2), corner to corner.
   const sqrtLine = `<line class="guide guide-sqrt" x1="${X(0)}" y1="${Y(0)}" x2="${X(xmax).toFixed(1)}" y2="${Y(xmax / 2).toFixed(1)}"/>
-      <text class="guide-label" x="${(X(xmax) - 8).toFixed(1)}" y="${(Y(xmax / 2) - 8).toFixed(1)}" text-anchor="end">r = &#8730;N</text>`
-  const nLine = `<line class="guide guide-n" x1="${X(0)}" y1="${Y(0)}" x2="${X(ymax).toFixed(1)}" y2="${Y(ymax).toFixed(1)}"/>
-      <text class="guide-label" x="${(X(ymax) + 10).toFixed(1)}" y="${(Y(ymax) + 4).toFixed(1)}">r = N</text>`
+      <text class="guide-label" x="${(X(xmax) - 8).toFixed(1)}" y="${(Y(xmax / 2) + 16).toFixed(1)}" text-anchor="end">r = &#8730;N</text>`
 
   const dots = pts
     .map((p) => {
@@ -184,7 +182,6 @@ function witnessPlot(pts: RecordPoint[]): string {
 
   return `<svg class="records-plot" viewBox="0 0 ${W} ${H}" role="img" aria-label="record witness size versus modulus, log-log scatter plot">
       ${grid}
-      ${nLine}
       ${sqrtLine}
       <line class="axis" x1="${L}" y1="${T}" x2="${L}" y2="${T + plotH}"/>
       <line class="axis" x1="${L}" y1="${T + plotH}" x2="${W - R}" y2="${T + plotH}"/>
