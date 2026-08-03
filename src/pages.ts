@@ -8,7 +8,7 @@ import {
 import type {
   ActivityItem,
   CommentView,
-  RecordDisplay,
+  RecordStatus,
   WitnessView,
 } from './store'
 import { COMMENT_MAX } from './store'
@@ -208,7 +208,10 @@ function recordsSection(records: RecordPoint[]): string {
   </section>`
 }
 
-function verifierForm(state: FormState): string {
+function verifierForm(state: FormState, user: User | null): string {
+  const submit = user
+    ? '<button type="submit">Verify</button>'
+    : '<a class="login-to-submit" href="/auth/github">Log in to submit</a>'
   return `
   <section class="panel">
     <h2>Submit a witness</h2>
@@ -219,7 +222,7 @@ function verifierForm(state: FormState): string {
       <label for="A">Elements of <var>A</var> (integers separated by commas, spaces, or newlines; brackets ok)</label>
       <textarea id="A" name="A" rows="8" required
                 placeholder="e.g. 0, 260, 268, 280, ...">${escapeHtml(state.elementsValue ?? '')}</textarea>
-      <button type="submit">Verify</button>
+      ${submit}
       <p class="muted form-note">Verification runs server-side in O(|A|&sup2;) time.
          Limits: N &le; ${MAX_N.toLocaleString('en-US')}, |A| &le; ${MAX_SET_SIZE.toLocaleString('en-US')}.</p>
     </form>
@@ -230,21 +233,11 @@ function fmtRatio(r: number): string {
   return r.toFixed(4)
 }
 
-function recordSection(size: number, N: number, record?: RecordDisplay): string {
+function recordSection(size: number, N: number, record?: RecordStatus): string {
   if (!record) return ''
   const nStr = N.toLocaleString('en-US')
   const recordLink = (text: string) =>
     record.witnessId ? `<a href="/witness/${record.witnessId}">${text}</a>` : text
-  if (record.kind === 'login-required') {
-    // The result page is the response to POST /verify, so the Referer-based
-    // OAuth return would land on a GET-less path; return to / explicitly.
-    if (record.wouldRecord) {
-      return `<p class="record-new">This would set the record for N = ${nStr} &mdash; <a href="/auth/github?return_to=/">log in</a> to record it (resubmit after logging in).</p>`
-    }
-    return `<p class="muted">The ${recordLink('record witness')} for N = ${nStr} has |A| = ${record.recordSize!.toLocaleString(
-      'en-US',
-    )}. <a href="/auth/github?return_to=/">Log in</a> to have record-setting witnesses saved to your name.</p>`
-  }
   if (record.recorded) {
     return `<p class="record-new">New record: the largest known witness for N = ${nStr}. Saved as ${recordLink(
       `witness #${record.witnessId}`,
@@ -260,7 +253,7 @@ function recordSection(size: number, N: number, record?: RecordDisplay): string 
   )}, so this one was not saved.</p>`
 }
 
-function resultSection(result: VerifyResult, record?: RecordDisplay): string {
+function resultSection(result: VerifyResult, record?: RecordStatus): string {
   if (!result.ok) {
     return `
     <section class="result result-error">
@@ -312,14 +305,14 @@ export function landingPage(
   user: User | null = null,
   result?: VerifyResult,
   form: FormState = {},
-  record?: RecordDisplay,
+  record?: RecordStatus,
   records: RecordPoint[] = [],
 ): string {
   const body = `
     ${problemStatement()}
     ${result ? resultSection(result, record) : ''}
     ${recordsSection(records)}
-    ${verifierForm(form)}
+    ${verifierForm(form, user)}
     <section class="prose api-note">
       <h2>API</h2>
       <p>
@@ -455,13 +448,12 @@ export function apiDocsPage(user: User | null = null): string {
       reduced mod <var>N</var>; duplicates after reduction are rejected. Limits:
       <var>N</var> &le; ${MAX_N.toLocaleString('en-US')} and
       |<var>A</var>| &le; ${MAX_SET_SIZE.toLocaleString('en-US')}.</p>
-      <p>Verification is open to everyone, but <strong>recording requires authentication</strong>:
-      send a bearer token (create one on your <a href="/profile">profile</a> page) and a
-      record-setting witness is saved and attributed to your account. Without a token the verdict
-      is still returned, but nothing is saved &mdash; the <code>record</code> field then reports
-      <code>{"recorded": false, "reason": "authentication required...", "wouldRecord": ...}</code>.</p>
+      <p>Requires an <code>Authorization: Bearer &lt;token&gt;</code> header &mdash; create a token
+      on your <a href="/profile">profile</a> page. Requests without a valid token receive
+      <code>401</code>. A record-setting witness is saved and attributed to your account.</p>
       <pre><code>${escapeHtml(verifyReq)}</code></pre>
-      <p>Returns <code>200</code> with the verdict, or <code>400</code> if the body isn&rsquo;t JSON of
+      <p>Returns <code>200</code> with the verdict, <code>401</code> without a valid token, or
+      <code>400</code> if the body isn&rsquo;t JSON of
       the form <code>{"N": &lt;integer&gt;, "A": [&lt;integers&gt;]}</code> or violates the limits.
       A <em>valid</em> witness that is larger than every previously recorded witness for its modulus
       is saved, and <code>record.recorded</code> is <code>true</code>; otherwise

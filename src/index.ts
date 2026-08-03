@@ -28,31 +28,9 @@ import {
   postCommentary,
   recentActivity,
   recordWitness,
-  standingRecord,
   userWitnesses,
-  type RecordDisplay,
+  type RecordStatus,
 } from './store'
-import type { Bindings } from './auth'
-import type { User } from './pages'
-
-// Recording requires login; verification does not. For a logged-out valid
-// submission, report the standing record instead of writing anything.
-async function recordOutcome(
-  env: Bindings,
-  result: Extract<VerifyResult, { ok: true }>,
-  user: User | null,
-): Promise<RecordDisplay> {
-  if (user) {
-    return { kind: 'attempted', ...(await recordWitness(env, result, user.id)) }
-  }
-  const standing = await standingRecord(env, result.N)
-  return {
-    kind: 'login-required',
-    wouldRecord: standing == null || result.size > standing.size,
-    recordSize: standing?.size ?? null,
-    witnessId: standing?.id ?? null,
-  }
-}
 import {
   MAX_ELEMENTS_TEXT_BYTES,
   MAX_SET_SIZE,
@@ -189,13 +167,15 @@ function verifyFromText(nText: string, elementsText: string): VerifyResult {
 app.get('/verify', (c) => c.redirect('/', 302))
 
 app.post('/verify', async (c) => {
+  const user = c.get('user')
+  if (!user) return c.redirect('/auth/github?return_to=/', 302)
   const body = await c.req.parseBody()
   const nText = typeof body.N === 'string' ? body.N : ''
   const elementsText = typeof body.A === 'string' ? body.A : ''
   const result = verifyFromText(nText, elementsText)
-  let record: RecordDisplay | undefined
+  let record: RecordStatus | undefined
   if (result.ok && result.valid) {
-    record = await recordOutcome(c.env, result, c.get('user'))
+    record = await recordWitness(c.env, result, user.id)
   }
   return c.html(
     landingPage(
@@ -209,6 +189,8 @@ app.post('/verify', async (c) => {
 })
 
 app.post('/api/verify', async (c) => {
+  const user = c.get('user')
+  if (!user) return c.json({ ok: false, error: 'authentication required' }, 401)
   let body: unknown
   try {
     body = await c.req.json()
@@ -230,18 +212,9 @@ app.post('/api/verify', async (c) => {
   }
   const result = verify(N, A as number[])
   if (!result.ok) return c.json(result, 400)
-  let record: Record<string, unknown> | undefined
+  let record: RecordStatus | undefined
   if (result.valid) {
-    const outcome = await recordOutcome(c.env, result, c.get('user'))
-    record =
-      outcome.kind === 'attempted'
-        ? { recorded: outcome.recorded, recordSize: outcome.recordSize, witnessId: outcome.witnessId }
-        : {
-            recorded: false,
-            reason: 'authentication required to record witnesses',
-            wouldRecord: outcome.wouldRecord,
-            recordSize: outcome.recordSize,
-          }
+    record = await recordWitness(c.env, result, user.id)
   }
   // Echoing the (possibly large) element list back is redundant for API users.
   const { elements: _elements, ...rest } = result
