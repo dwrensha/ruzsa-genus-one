@@ -8,7 +8,7 @@ import {
 import type {
   ActivityItem,
   CommentView,
-  RecordStatus,
+  RecordDisplay,
   WitnessView,
 } from './store'
 import { COMMENT_MAX } from './store'
@@ -230,11 +230,19 @@ function fmtRatio(r: number): string {
   return r.toFixed(4)
 }
 
-function recordSection(size: number, N: number, record?: RecordStatus): string {
+function recordSection(size: number, N: number, record?: RecordDisplay): string {
   if (!record) return ''
   const nStr = N.toLocaleString('en-US')
   const recordLink = (text: string) =>
     record.witnessId ? `<a href="/witness/${record.witnessId}">${text}</a>` : text
+  if (record.kind === 'login-required') {
+    if (record.wouldRecord) {
+      return `<p class="record-new">This would set the record for N = ${nStr} &mdash; <a href="/auth/github">log in</a> to record it.</p>`
+    }
+    return `<p class="muted">The ${recordLink('record witness')} for N = ${nStr} has |A| = ${record.recordSize!.toLocaleString(
+      'en-US',
+    )}. <a href="/auth/github">Log in</a> to have record-setting witnesses saved to your name.</p>`
+  }
   if (record.recorded) {
     return `<p class="record-new">New record: the largest known witness for N = ${nStr}. Saved as ${recordLink(
       `witness #${record.witnessId}`,
@@ -250,7 +258,7 @@ function recordSection(size: number, N: number, record?: RecordStatus): string {
   )}, so this one was not saved.</p>`
 }
 
-function resultSection(result: VerifyResult, record?: RecordStatus): string {
+function resultSection(result: VerifyResult, record?: RecordDisplay): string {
   if (!result.ok) {
     return `
     <section class="result result-error">
@@ -302,7 +310,7 @@ export function landingPage(
   user: User | null = null,
   result?: VerifyResult,
   form: FormState = {},
-  record?: RecordStatus,
+  record?: RecordDisplay,
   records: RecordPoint[] = [],
 ): string {
   const body = `
@@ -445,9 +453,11 @@ export function apiDocsPage(user: User | null = null): string {
       reduced mod <var>N</var>; duplicates after reduction are rejected. Limits:
       <var>N</var> &le; ${MAX_N.toLocaleString('en-US')} and
       |<var>A</var>| &le; ${MAX_SET_SIZE.toLocaleString('en-US')}.</p>
-      <p>Authorization is optional. With a bearer token (create one on your
-      <a href="/profile">profile</a> page) a record-setting witness is attributed to your account;
-      without one it is recorded anonymously.</p>
+      <p>Verification is open to everyone, but <strong>recording requires authentication</strong>:
+      send a bearer token (create one on your <a href="/profile">profile</a> page) and a
+      record-setting witness is saved and attributed to your account. Without a token the verdict
+      is still returned, but nothing is saved &mdash; the <code>record</code> field then reports
+      <code>{"recorded": false, "reason": "authentication required...", "wouldRecord": ...}</code>.</p>
       <pre><code>${escapeHtml(verifyReq)}</code></pre>
       <p>Returns <code>200</code> with the verdict, or <code>400</code> if the body isn&rsquo;t JSON of
       the form <code>{"N": &lt;integer&gt;, "A": [&lt;integers&gt;]}</code> or violates the limits.

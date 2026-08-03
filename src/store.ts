@@ -163,6 +163,30 @@ export interface RecordStatus {
   witnessId: number
 }
 
+/**
+ * What the submitter is told about record-keeping. Recording requires
+ * login: an anonymous valid submission is never saved, and instead reports
+ * the standing record (if any) and whether this set would have beaten it.
+ */
+export type RecordDisplay =
+  | ({ kind: 'attempted' } & RecordStatus)
+  | {
+      kind: 'login-required'
+      wouldRecord: boolean
+      recordSize: number | null
+      witnessId: number | null
+    }
+
+/** The current record row for a modulus, or null if none. */
+export async function standingRecord(
+  env: Bindings,
+  n: number,
+): Promise<{ id: number; size: number } | null> {
+  return env.DB.prepare('SELECT id, size FROM witnesses WHERE n = ? ORDER BY size DESC LIMIT 1')
+    .bind(n)
+    .first<{ id: number; size: number }>()
+}
+
 /** The current record witness (id, n, size) for every modulus that has one. */
 export async function currentRecords(env: Bindings): Promise<RecordPoint[]> {
   const { results } = await env.DB.prepare(
@@ -179,7 +203,7 @@ export async function currentRecords(env: Bindings): Promise<RecordPoint[]> {
 export async function recordWitness(
   env: Bindings,
   result: ValidResult,
-  userId: number | null,
+  userId: number,
 ): Promise<RecordStatus> {
   const ins = await env.DB.prepare(
     `INSERT INTO witnesses (n, size, ratio, elements, submitter_user_id)
