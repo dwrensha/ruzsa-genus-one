@@ -25,6 +25,18 @@
       "id": "fb174c11f72841c3b525995541d53cf0"
     }
   ],
+  "ratelimits": [
+    {
+      "name": "SUBMISSION_RATE_LIMITER",
+      // Unique integer namespace for per-account submission limits.
+      // (677255 is taken by elliptic-rank on this account.)
+      "namespace_id": "677256",
+      "simple": {
+        "limit": 60,
+        "period": 60
+      }
+    }
+  ],
   "observability": {
     "enabled": true
   }

@@ -42,6 +42,13 @@ import {
   verify,
   type VerifyResult,
 } from './verify'
+import {
+  checkSubmissionRateLimit,
+  SUBMISSION_RATE_LIMIT,
+  SUBMISSION_RATE_PERIOD_SEC,
+} from './rateLimit'
+
+const rateLimitMessage = `submission rate limit exceeded: ${SUBMISSION_RATE_LIMIT} per ${SUBMISSION_RATE_PERIOD_SEC} seconds`
 
 const app = new Hono<AppEnv>()
 
@@ -261,6 +268,19 @@ const RESULT_FLASH_TTL_SEC = 10 * 60
 app.post('/verify', async (c) => {
   const user = c.get('user')
   if (!user) return c.redirect('/auth/github?return_to=/', 302)
+  const rate = await checkSubmissionRateLimit(c.env, user.id)
+  if (!rate.allowed) {
+    c.header('Retry-After', String(rate.retryAfter))
+    return c.html(
+      resultPage(
+        user,
+        { ok: false, error: `${rateLimitMessage}; retry in about ${rate.retryAfter} seconds` },
+        undefined,
+        {},
+      ),
+      429,
+    )
+  }
   const body = await c.req.parseBody()
   const nText = typeof body.N === 'string' ? body.N : ''
   const elementsText = typeof body.A === 'string' ? body.A : ''
@@ -293,6 +313,22 @@ app.get('/result/:key', async (c) => {
 app.post('/api/verify', async (c) => {
   const user = c.get('user')
   if (!user) return c.json({ ok: false, error: 'authentication required' }, 401)
+  const rate = await checkSubmissionRateLimit(c.env, user.id)
+  if (!rate.allowed) {
+    c.header('Retry-After', String(rate.retryAfter))
+    return c.json(
+      {
+        ok: false,
+        error: `${rateLimitMessage}; retry in about ${rate.retryAfter} seconds`,
+        rateLimit: {
+          limit: SUBMISSION_RATE_LIMIT,
+          period: SUBMISSION_RATE_PERIOD_SEC,
+          retryAfter: rate.retryAfter,
+        },
+      },
+      429,
+    )
+  }
   let body: unknown
   try {
     body = await c.req.json()
