@@ -615,7 +615,7 @@ export function witnessDetailPage(
   const isCurrent = w.size === w.record_size
   const status = isCurrent
     ? 'current record for this modulus'
-    : `superseded &mdash; the record is now |A| = ${w.record_size.toLocaleString('en-US')}`
+    : `superseded &mdash; the record is now <a href="/witness/${w.record_id}">|A| = ${w.record_size.toLocaleString('en-US')}</a>`
   const body = `
     <section class="prose">
       <p class="page-nav"><a href="/">&larr; home</a> &nbsp;&middot;&nbsp; <a href="/witnesses">all witnesses</a></p>

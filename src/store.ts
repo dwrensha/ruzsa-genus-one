@@ -26,6 +26,7 @@ export interface WitnessView {
   submitter_name: string | null
   current_comment_id: number | null
   record_size: number // MAX(size) for this n — equal to size when still the record
+  record_id: number // witness id holding that record — the row's own id when current
 }
 
 export async function loadWitness(
@@ -35,7 +36,8 @@ export async function loadWitness(
   const witness = await env.DB.prepare(
     `SELECT w.id, w.n, w.size, w.ratio, w.elements, w.created_at, w.current_comment_id,
             u.display_name AS submitter_name,
-            (SELECT MAX(size) FROM witnesses WHERE n = w.n) AS record_size
+            (SELECT MAX(size) FROM witnesses WHERE n = w.n) AS record_size,
+            (SELECT id FROM witnesses WHERE n = w.n ORDER BY size DESC LIMIT 1) AS record_id
        FROM witnesses w LEFT JOIN users u ON u.id = w.submitter_user_id
        WHERE w.id = ?`,
   )
