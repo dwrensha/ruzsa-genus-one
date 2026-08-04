@@ -172,7 +172,7 @@ var {
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem;
-  margin: 0.75rem 0 0.25rem;
+  margin: 0 0 0.25rem;
   border-bottom: 1px solid var(--panel-edge);
 }
 

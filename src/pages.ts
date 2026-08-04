@@ -205,12 +205,12 @@ function sizePlot(pts: RecordPoint[]): string {
   const lineAngle = (Math.atan2(-INNER_H, INNER_W) * 180) / Math.PI
   const labelX = PLOT.L + 0.85 * INNER_W, labelY = PLOT.T + 0.15 * INNER_H
   const sqrtLine = `<line class="guide guide-sqrt" x1="${plotX(0)}" y1="${Y(0)}" x2="${plotX(LOG_NMAX).toFixed(1)}" y2="${Y(LOG_NMAX / 2).toFixed(1)}"/>
-      <text class="guide-label" transform="rotate(${lineAngle.toFixed(1)} ${labelX.toFixed(1)} ${labelY.toFixed(1)})" x="${labelX.toFixed(1)}" y="${labelY.toFixed(1)}" dy="-7" text-anchor="end">r = &#8730;N</text>`
+      <text class="guide-label" transform="rotate(${lineAngle.toFixed(1)} ${labelX.toFixed(1)} ${labelY.toFixed(1)})" x="${labelX.toFixed(1)}" y="${labelY.toFixed(1)}" dy="-7" text-anchor="end">|A| = &#8730;N</text>`
 
   const dots = pts.map((p) => recordDot(p, Y(Math.log10(p.size)))).join('\n      ')
   return plotSvg(
     'record witness size versus modulus, log-log scatter plot',
-    'record witness size r(N) &#8594;',
+    'record witness size |A| &#8594;',
     `${grid}\n      ${sqrtLine}\n      ${dots}`,
   )
 }
@@ -230,15 +230,15 @@ function exponentPlot(pts: RecordPoint[]): string {
   }
 
   const sqrtLine = `<line class="guide guide-sqrt" x1="${PLOT.L}" y1="${Y(0.5)}" x2="${PLOT.W - PLOT.R}" y2="${Y(0.5)}"/>
-      <text class="guide-label" x="${PLOT.W - PLOT.R - 8}" y="${(Y(0.5) + 16).toFixed(1)}" text-anchor="end">r = &#8730;N</text>`
+      <text class="guide-label" x="${PLOT.W - PLOT.R - 8}" y="${(Y(0.5) + 16).toFixed(1)}" text-anchor="end">|A| = &#8730;N</text>`
 
   const dots = pts
     .filter((p) => Math.log(p.size) / Math.log(p.n) >= ymin)
     .map((p) => recordDot(p, Y(Math.log(p.size) / Math.log(p.n))))
     .join('\n      ')
   return plotSvg(
-    'exponent log r over log N versus modulus scatter plot',
-    'exponent log r(N) / log N &#8594;',
+    'exponent log |A| over log N versus modulus scatter plot',
+    'exponent log |A| / log N &#8594;',
     `${grid}\n      ${sqrtLine}\n      ${dots}`,
   )
 }
@@ -250,14 +250,13 @@ function recordsSection(records: RecordPoint[]): string {
       : `<input class="plot-radio" type="radio" name="records-plot" id="plot-size" checked>
     <input class="plot-radio" type="radio" name="records-plot" id="plot-exponent">
     <div class="plot-tabs">
-      <label for="plot-size">record size r(N)</label>
-      <label for="plot-exponent">exponent log&thinsp;r&thinsp;/&thinsp;log&thinsp;N</label>
+      <label for="plot-size">record size |A|</label>
+      <label for="plot-exponent">exponent log&thinsp;|A|&thinsp;/&thinsp;log&thinsp;N</label>
     </div>
     <div class="plot-panel plot-panel-size">${sizePlot(records)}</div>
     <div class="plot-panel plot-panel-exponent">${exponentPlot(records)}</div>`
   return `
   <section class="panel records">
-    <h2>Records</h2>
     ${inner}
     <p class="muted plot-caption">Each dot is the largest known witness for its modulus.
     A dot above the dashed line beats &radic;<span class="sqrt">N</span>.</p>
@@ -331,6 +330,9 @@ function resultSection(result: VerifyResult, record?: RecordStatus): string {
         <div><dt>|A|</dt><dd>${result.size.toLocaleString('en-US')}</dd></div>
         <div><dt>&radic;<span class="sqrt">N</span></dt><dd>${sqrtN.toFixed(1)}</dd></div>
         <div><dt>score |A|/&radic;<span class="sqrt">N</span></dt><dd class="score">${fmtRatio(result.ratio)}</dd></div>
+        <div><dt>exponent log&thinsp;|A|&thinsp;/&thinsp;log&thinsp;N</dt><dd class="score">${(
+          Math.log(result.size) / Math.log(result.N)
+        ).toFixed(4)}</dd></div>
       </dl>`
   if (result.valid) {
     const beats = result.ratio > 1
@@ -624,6 +626,9 @@ export function witnessDetailPage(
         <div><dt>N</dt><dd>${w.n.toLocaleString('en-US')}</dd></div>
         <div><dt>|A|</dt><dd>${w.size.toLocaleString('en-US')}</dd></div>
         <div><dt>score |A|/&radic;<span class="sqrt">N</span></dt><dd class="score">${w.ratio.toFixed(4)}</dd></div>
+        <div><dt>exponent log&thinsp;|A|&thinsp;/&thinsp;log&thinsp;N</dt><dd class="score">${(
+          Math.log(w.size) / Math.log(w.n)
+        ).toFixed(4)}</dd></div>
       </dl>
       <dl class="witness-meta">
         <dt>status</dt><dd>${status}</dd>
