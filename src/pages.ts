@@ -583,7 +583,7 @@ function commentarySection(witnessId: number, comment: CommentView | null, user:
   const meta = comment
     ? `<p class="comment-meta">last edited ${comment.author ? `by ${escapeHtml(comment.author)} ` : ''}at ${escapeHtml(
         comment.created_at,
-      )} &middot; <a href="/witness/${witnessId}/commentary-history">history</a></p>`
+      )} UTC &middot; <a href="/witness/${witnessId}/commentary-history">history</a></p>`
     : ''
   const editor = user
     ? `<details class="comment-edit">
@@ -637,7 +637,7 @@ export function witnessDetailPage(
       <dl class="witness-meta">
         <dt>status</dt><dd>${status}</dd>
         <dt>submitted by</dt><dd>${submitter}</dd>
-        <dt>submitted at</dt><dd>${escapeHtml(w.created_at)}</dd>
+        <dt>submitted at</dt><dd>${escapeHtml(w.created_at)} UTC</dd>
       </dl>
       <section class="witness-elements">
         <h3>Elements <span class="muted">(${elements.length.toLocaleString('en-US')})</span></h3>
@@ -659,7 +659,7 @@ export function commentaryHistoryPage(
           (e) => `<li>
         <p class="comment-meta">${e.author ? escapeHtml(e.author) : '<span class="muted">(deleted user)</span>'} &middot; ${escapeHtml(
             e.created_at,
-          )}</p>
+          )} UTC</p>
         ${e.content.length > 0 ? `<div class="comment-body">${renderCommentary(e.content)}</div>` : `<p class="muted">(cleared)</p>`}
       </li>`,
         )
@@ -679,6 +679,31 @@ function clip(s: string, n: number): string {
   return s.length > n ? s.slice(0, n) + '…' : s
 }
 
+// A SQLite CURRENT_TIMESTAMP string ('YYYY-MM-DD HH:MM:SS', UTC) as a
+// timezone-free relative time ("3 hours ago"), with the exact UTC instant
+// in the tooltip and a machine-readable datetime attribute.
+function relativeTime(ts: string): string {
+  const then = new Date(ts.replace(' ', 'T') + 'Z').getTime()
+  if (Number.isNaN(then)) return escapeHtml(ts)
+  const s = Math.max(0, Math.floor((Date.now() - then) / 1000))
+  const units: [number, string][] = [
+    [31536000, 'year'],
+    [2592000, 'month'],
+    [86400, 'day'],
+    [3600, 'hour'],
+    [60, 'minute'],
+  ]
+  let text = 'just now'
+  for (const [secs, name] of units) {
+    if (s >= secs) {
+      const k = Math.floor(s / secs)
+      text = `${k} ${name}${k === 1 ? '' : 's'} ago`
+      break
+    }
+  }
+  return `<time datetime="${ts.replace(' ', 'T')}Z" title="${escapeHtml(ts)} UTC">${text}</time>`
+}
+
 // Recent-activity feed: record witnesses and commentary edits, newest first.
 export function activityPage(
   items: ActivityItem[],
@@ -689,7 +714,7 @@ export function activityPage(
   const who = (u: string | null) => (u ? escapeHtml(u) : '<span class="muted">anonymous</span>')
   const entry = (a: ActivityItem): string => {
     const link = `<a href="/witness/${a.witness_id}">witness #${a.witness_id}</a>`
-    const meta = `<p class="activity-meta">${escapeHtml(a.ts)} &middot; ${who(a.user)}</p>`
+    const meta = `<p class="activity-meta">${relativeTime(a.ts)} &middot; ${who(a.user)}</p>`
     if (a.kind === 'record') {
       return `<li>
         ${meta}
