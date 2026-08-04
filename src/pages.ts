@@ -9,6 +9,7 @@ import type {
   ActivityItem,
   CommentView,
   RecordStatus,
+  WitnessListRow,
   WitnessView,
 } from './store'
 import { COMMENT_MAX } from './store'
@@ -87,6 +88,7 @@ export function layout(title: string, bodyInner: string, user: User | null = nul
     <footer>
       <div class="inner">
         <nav class="footer-links">
+          <a href="/witnesses">witnesses</a> &nbsp;&middot;&nbsp;
           <a href="/recent">recent activity</a> &nbsp;&middot;&nbsp;
           <a href="/api">API</a> &nbsp;&middot;&nbsp;
           <a class="external" href="https://github.com/dwrensha/ruzsa-genus-one">source</a> &nbsp;&middot;&nbsp;
@@ -259,6 +261,7 @@ function recordsSection(records: RecordPoint[]): string {
     ${inner}
     <p class="muted plot-caption">Each dot is the largest known witness for its modulus.
     A dot above the dashed line beats &radic;<span class="sqrt">N</span>.</p>
+    <p class="plot-caption"><a href="/witnesses">Browse all witnesses &rarr;</a></p>
     <p class="plot-caption"><a class="nowrap" href="/database.json" download>Download all records (JSON) &darr;</a></p>
   </section>`
 }
@@ -712,6 +715,122 @@ export function activityPage(
       <nav class="pager">${newer} <span class="muted">page ${page + 1}</span> ${older}</nav>
     </section>`
   return layout(`Recent activity — ${SITE_NAME}`, body, user)
+}
+
+// The /witnesses table. Sorting is server-side via query params — the column
+// header links carry the target sort state, so the page needs no JS.
+const WITNESS_SORT_KEYS = ['id', 'n', 'size', 'score', 'exponent', 'date'] as const
+type WitnessSortKey = (typeof WITNESS_SORT_KEYS)[number]
+
+// First-click direction per column: sizes and scores are most interesting
+// large-first, ids/moduli small-first.
+const WITNESS_SORT_DEFAULT_DIR: Record<WitnessSortKey, 'asc' | 'desc'> = {
+  id: 'asc',
+  n: 'asc',
+  size: 'desc',
+  score: 'desc',
+  exponent: 'desc',
+  date: 'desc',
+}
+
+export function witnessesPage(
+  rows: WitnessListRow[],
+  query: { sort?: string; dir?: string; current?: string },
+  user: User | null = null,
+): string {
+  const sort: WitnessSortKey = (WITNESS_SORT_KEYS as readonly string[]).includes(query.sort ?? '')
+    ? (query.sort as WitnessSortKey)
+    : 'n'
+  const dir: 'asc' | 'desc' =
+    query.dir === 'asc' || query.dir === 'desc' ? query.dir : WITNESS_SORT_DEFAULT_DIR[sort]
+  const currentOnly = query.current === '1'
+
+  const exponent = (w: WitnessListRow) => Math.log(w.size) / Math.log(w.n)
+  const keyValue: Record<WitnessSortKey, (w: WitnessListRow) => number | string> = {
+    id: (w) => w.id,
+    n: (w) => w.n,
+    size: (w) => w.size,
+    score: (w) => w.ratio,
+    exponent,
+    date: (w) => w.created_at,
+  }
+
+  const shown = currentOnly ? rows.filter((r) => r.is_current) : rows.slice()
+  const val = keyValue[sort]
+  const flip = dir === 'desc' ? -1 : 1
+  shown.sort((a, b) => {
+    const av = val(a), bv = val(b)
+    const cmp = av < bv ? -1 : av > bv ? 1 : 0
+    return cmp !== 0 ? cmp * flip : a.n - b.n || a.size - b.size
+  })
+
+  const href = (s: WitnessSortKey, d: 'asc' | 'desc', current: boolean): string => {
+    const q = new URLSearchParams()
+    if (!(s === 'n' && d === 'asc')) {
+      q.set('sort', s)
+      q.set('dir', d)
+    }
+    if (current) q.set('current', '1')
+    const qs = q.toString()
+    return '/witnesses' + (qs ? '?' + qs : '')
+  }
+  const th = (key: WitnessSortKey, label: string, cls = '', title = ''): string => {
+    const active = key === sort
+    const target = active ? (dir === 'asc' ? 'desc' : 'asc') : WITNESS_SORT_DEFAULT_DIR[key]
+    return `<th${cls ? ` class="${cls}"` : ''}><a class="sort${active ? ` ${dir}` : ''}" href="${href(
+      key,
+      target,
+      currentOnly,
+    )}"${title ? ` title="${title}"` : ''}>${label}</a></th>`
+  }
+
+  const trs = shown
+    .map(
+      (w) => `<tr>
+        <td><a href="/witness/${w.id}">#${w.id}</a></td>
+        <td class="num">${w.n.toLocaleString('en-US')}</td>
+        <td class="num">${w.size.toLocaleString('en-US')}</td>
+        <td class="num">${w.ratio.toFixed(4)}</td>
+        <td class="num">${exponent(w).toFixed(4)}</td>
+        <td>${w.submitter ? escapeHtml(w.submitter) : '<span class="muted">anonymous</span>'}</td>
+        <td>${escapeHtml(w.created_at)}</td>
+        <td>${w.is_current ? 'current' : '<span class="muted">superseded</span>'}</td>
+      </tr>`,
+    )
+    .join('\n')
+
+  const filterToggle = currentOnly
+    ? `<a href="${href(sort, dir, false)}">all</a> &middot; <strong>current records only</strong>`
+    : `<strong>all</strong> &middot; <a href="${href(sort, dir, true)}">current records only</a>`
+  const heading = currentOnly ? 'Current record witnesses' : 'All witnesses'
+
+  const body = `
+    <section class="prose">
+      <p class="page-nav"><a href="/">&larr; home</a></p>
+      <h2>${heading}</h2>
+      <p class="muted">Every record-setting witness ever submitted; a superseded row was the
+      record for its modulus until a larger set beat it. Click a column header to sort; click
+      again to reverse.</p>
+      <p class="table-controls muted">showing ${shown.length} of ${rows.length} witnesses
+        &nbsp;&middot;&nbsp; ${filterToggle}
+        &nbsp;&middot;&nbsp; <a href="/database.json" download>Download (JSON) &darr;</a></p>
+      <div class="table-scroll">
+      <table class="tokens-table witnesses-table">
+        <thead><tr>
+          ${th('id', 'witness')}
+          ${th('n', 'N', 'num')}
+          ${th('size', '|A|', 'num')}
+          ${th('score', 'score', 'num', 'score |A| / sqrt(N)')}
+          ${th('exponent', 'exponent', 'num', 'exponent log |A| / log N')}
+          <th>submitter</th>
+          ${th('date', 'submitted')}
+          <th>status</th>
+        </tr></thead>
+        <tbody>${trs}</tbody>
+      </table>
+      </div>
+    </section>`
+  return layout(`${heading} — ${SITE_NAME}`, body, user)
 }
 
 export function acknowledgePage(user: User | null = null): string {

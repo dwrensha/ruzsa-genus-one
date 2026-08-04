@@ -324,6 +324,42 @@ var {
   font-size: 0.9rem;
 }
 
+/* The /witnesses table: sortable column headers with a direction arrow on
+   the active column, in a horizontally scrollable wrapper for small screens. */
+.table-scroll {
+  overflow-x: auto;
+}
+
+.witnesses-table {
+  white-space: nowrap;
+}
+
+.witnesses-table th a.sort {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.witnesses-table th a.sort:hover {
+  color: var(--accent);
+}
+
+.witnesses-table th a.sort.asc,
+.witnesses-table th a.sort.desc {
+  color: var(--fg);
+}
+
+.witnesses-table th a.sort.asc::after {
+  content: " \2191"; /* up arrow */
+}
+
+.witnesses-table th a.sort.desc::after {
+  content: " \2193"; /* down arrow */
+}
+
+.table-controls {
+  font-size: 0.9rem;
+}
+
 .inline-form {
   display: inline;
   margin: 0;

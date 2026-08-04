@@ -152,6 +152,30 @@ export function userWitnesses(env: Bindings, userId: number): Promise<UserWitnes
     .then((r) => r.results)
 }
 
+/** One row on the /witnesses listing page. */
+export interface WitnessListRow {
+  id: number
+  n: number
+  size: number
+  ratio: number
+  created_at: string
+  submitter: string | null
+  is_current: number // SQLite boolean: 1 when still the record for n
+}
+
+/** Every record-setting witness ever stored, current and superseded. */
+export function allWitnesses(env: Bindings): Promise<WitnessListRow[]> {
+  return env.DB.prepare(
+    `SELECT w.id, w.n, w.size, w.ratio, w.created_at,
+            u.display_name AS submitter,
+            (w.size = (SELECT MAX(size) FROM witnesses WHERE n = w.n)) AS is_current
+       FROM witnesses w LEFT JOIN users u ON u.id = w.submitter_user_id
+       ORDER BY w.n, w.size`,
+  )
+    .all<WitnessListRow>()
+    .then((r) => r.results)
+}
+
 export type ValidResult = Extract<VerifyResult, { ok: true }>
 
 export interface RecordStatus {

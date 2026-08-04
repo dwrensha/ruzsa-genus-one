@@ -9,6 +9,7 @@ import {
   profilePage,
   resultPage,
   witnessDetailPage,
+  witnessesPage,
   type FormState,
 } from './pages'
 import {
@@ -22,6 +23,7 @@ import {
   updateSessionUser,
 } from './auth'
 import {
+  allWitnesses,
   COMMENT_MAX,
   commentaryHistory,
   currentRecords,
@@ -119,6 +121,16 @@ app.get('/database.json', async (c) => {
 })
 
 app.get('/acknowledge', (c) => c.html(acknowledgePage(c.get('user'))))
+
+app.get('/witnesses', async (c) =>
+  c.html(
+    witnessesPage(
+      await allWitnesses(c.env),
+      { sort: c.req.query('sort'), dir: c.req.query('dir'), current: c.req.query('current') },
+      c.get('user'),
+    ),
+  ),
+)
 
 app.get('/witness/:id', async (c) => {
   const id = Number(c.req.param('id'))
