@@ -618,7 +618,7 @@ export function witnessDetailPage(
     : `superseded &mdash; the record is now |A| = ${w.record_size.toLocaleString('en-US')}`
   const body = `
     <section class="prose">
-      <p class="page-nav"><a href="/">&larr; home</a> &nbsp;&middot;&nbsp; <a href="/recent">recent activity</a></p>
+      <p class="page-nav"><a href="/">&larr; home</a> &nbsp;&middot;&nbsp; <a href="/witnesses">all witnesses</a></p>
       ${justRecorded ? `<p class="record-new">New record: the largest known witness for N = ${w.n.toLocaleString('en-US')}. Saved. 🏅</p>` : ''}
       <h2>witness #${w.id}</h2>
       <dl class="stats">
