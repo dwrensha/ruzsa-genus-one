@@ -783,7 +783,7 @@ export function witnessesPage(
 ): string {
   const sort: WitnessSortKey = (WITNESS_SORT_KEYS as readonly string[]).includes(query.sort ?? '')
     ? (query.sort as WitnessSortKey)
-    : 'n'
+    : 'score'
   const dir: 'asc' | 'desc' =
     query.dir === 'asc' || query.dir === 'desc' ? query.dir : WITNESS_SORT_DEFAULT_DIR[sort]
   const currentOnly = query.current === '1'
@@ -817,7 +817,7 @@ export function witnessesPage(
     n: number | null = nFilter,
   ): string => {
     const q = new URLSearchParams()
-    if (!(s === 'n' && d === 'asc')) {
+    if (!(s === 'score' && d === 'desc')) {
       q.set('sort', s)
       q.set('dir', d)
     }
@@ -857,7 +857,7 @@ export function witnessesPage(
   // The modulus filter is a plain GET form (the page has no JS); hidden inputs
   // mirror href() so submitting preserves the sort and current-only state.
   const hiddenState =
-    (sort === 'n' && dir === 'asc'
+    (sort === 'score' && dir === 'desc'
       ? ''
       : `<input type="hidden" name="sort" value="${sort}"><input type="hidden" name="dir" value="${dir}">`) +
     (currentOnly ? '<input type="hidden" name="current" value="1">' : '')
