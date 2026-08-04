@@ -55,7 +55,12 @@ app.use('*', async (c, next) => {
 
 app.get('/', async (c) =>
   c.html(
-    landingPage(c.get('user'), await currentRecords(c.env), c.req.query('expired') === '1'),
+    landingPage(
+      c.get('user'),
+      await currentRecords(c.env),
+      c.req.query('expired') === '1',
+      c.req.query('plot') === 'exponent' ? 'exponent' : 'size',
+    ),
   ),
 )
 

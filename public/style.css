@@ -159,15 +159,9 @@ var {
   font-weight: 600;
 }
 
-/* Plot switcher: hidden radios drive which .plot-panel sibling shows, no JS.
-   The active tab label gets an accent underline overlapping the shared
-   bottom border. */
-.records .plot-radio {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
+/* Plot switcher: the tabs are links carrying the ?plot= query param, so the
+   selection lives in the URL and survives reloads. The active tab gets an
+   accent underline overlapping the shared bottom border. */
 .records .plot-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -176,34 +170,26 @@ var {
   border-bottom: 1px solid var(--panel-edge);
 }
 
-.records .plot-tabs label {
+.records .plot-tabs a,
+.records .plot-tabs .active {
   padding: 0.35rem 0.9rem;
   margin-bottom: -1px; /* overlap the container's bottom border */
-  color: var(--muted);
   border-bottom: 2px solid transparent;
-  cursor: pointer;
+  text-decoration: none;
 }
 
-.records .plot-tabs label:hover {
+.records .plot-tabs a {
+  color: var(--muted);
+}
+
+.records .plot-tabs a:hover {
   color: var(--accent);
 }
 
-#plot-size:checked ~ .plot-tabs label[for="plot-size"],
-#plot-exponent:checked ~ .plot-tabs label[for="plot-exponent"] {
+.records .plot-tabs .active {
   color: var(--fg);
   border-bottom-color: var(--accent);
   font-weight: 600;
-}
-
-#plot-size:focus-visible ~ .plot-tabs label[for="plot-size"],
-#plot-exponent:focus-visible ~ .plot-tabs label[for="plot-exponent"] {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-#plot-size:checked ~ .plot-panel-exponent,
-#plot-exponent:checked ~ .plot-panel-size {
-  display: none;
 }
 
 .records-plot {

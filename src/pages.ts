@@ -241,18 +241,22 @@ function exponentPlot(pts: RecordPoint[]): string {
   )
 }
 
-function recordsSection(records: RecordPoint[]): string {
+/** Which records plot the home page shows; selected via the ?plot= query param. */
+export type PlotKind = 'size' | 'exponent'
+
+function recordsSection(records: RecordPoint[], plot: PlotKind): string {
+  const tab = (kind: PlotKind, href: string, label: string) =>
+    kind === plot
+      ? `<span class="active" aria-current="page">${label}</span>`
+      : `<a href="${href}">${label}</a>`
   const inner =
     records.length === 0
       ? '<p class="muted">No record witnesses yet &mdash; submit a valid set to put the first dot on the board.</p>'
-      : `<input class="plot-radio" type="radio" name="records-plot" id="plot-size" checked>
-    <input class="plot-radio" type="radio" name="records-plot" id="plot-exponent">
-    <div class="plot-tabs">
-      <label for="plot-size">record size |A|</label>
-      <label for="plot-exponent">exponent log&thinsp;|A|&thinsp;/&thinsp;log&thinsp;N</label>
-    </div>
-    <div class="plot-panel plot-panel-size">${sizePlot(records)}</div>
-    <div class="plot-panel plot-panel-exponent">${exponentPlot(records)}</div>`
+      : `<nav class="plot-tabs">
+      ${tab('size', '/', 'record size |A|')}
+      ${tab('exponent', '/?plot=exponent', 'exponent log&thinsp;|A|&thinsp;/&thinsp;log&thinsp;N')}
+    </nav>
+    <div class="plot-panel">${plot === 'exponent' ? exponentPlot(records) : sizePlot(records)}</div>`
   return `
   <section class="panel records">
     ${inner}
@@ -369,6 +373,7 @@ export function landingPage(
   user: User | null = null,
   records: RecordPoint[] = [],
   resultExpired = false,
+  plot: PlotKind = 'size',
 ): string {
   const expiredNote = resultExpired
     ? '<section class="prose"><p class="muted">That result link has expired &mdash; submit the set again below.</p></section>'
@@ -376,7 +381,7 @@ export function landingPage(
   const body = `
     ${problemStatement()}
     ${expiredNote}
-    ${recordsSection(records)}
+    ${recordsSection(records, plot)}
     ${verifierForm({}, user)}
     <section class="prose api-note">
       <h2>API</h2>
