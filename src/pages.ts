@@ -88,8 +88,6 @@ export function layout(title: string, bodyInner: string, user: User | null = nul
     <footer>
       <div class="inner">
         <nav class="footer-links">
-          <a href="/witnesses">witnesses</a> &nbsp;&middot;&nbsp;
-          <a href="/recent">recent activity</a> &nbsp;&middot;&nbsp;
           <a href="/api">API</a> &nbsp;&middot;&nbsp;
           <a class="external" href="https://github.com/dwrensha/ruzsa-genus-one">source</a> &nbsp;&middot;&nbsp;
           <a class="external" href="https://icarm.io">icarm.io</a>
@@ -260,7 +258,8 @@ function recordsSection(records: RecordPoint[]): string {
     ${inner}
     <p class="muted plot-caption">Each dot is the largest known witness for its modulus.
     A dot above the dashed line beats &radic;<span class="sqrt">N</span>.</p>
-    <p class="plot-caption"><a href="/witnesses">Browse all witnesses &rarr;</a></p>
+    <p class="plot-caption"><a href="/witnesses">Browse all witnesses &rarr;</a> &nbsp;&middot;&nbsp;
+    <a href="/recent">Recent activity &rarr;</a></p>
     <p class="plot-caption"><a class="nowrap" href="/database.json" download>Download all records (JSON) &darr;</a></p>
   </section>`
 }

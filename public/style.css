@@ -538,6 +538,7 @@ var {
 
 .footer-links {
   margin-bottom: 0.5rem;
+  text-align: center;
 }
 
 .footer-links a {
