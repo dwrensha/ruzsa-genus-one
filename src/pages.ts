@@ -74,6 +74,14 @@ export function layout(title: string, bodyInner: string, user: User | null = nul
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(title)}</title>
     <meta name="description" content="${escapeHtml(SITE_DESCRIPTION)}" />
+    <meta property="og:site_name" content="${escapeHtml(SITE_NAME)}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="${escapeHtml(title)}" />
+    <meta property="og:description" content="${escapeHtml(SITE_DESCRIPTION)}" />
+    <meta property="og:image" content="https://ruzsa-genus-one.icarm.cloud/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="stylesheet" href="/style.css" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   </head>
