@@ -263,7 +263,8 @@ function recordsSection(records: RecordPoint[], plot: PlotKind): string {
     <p class="muted plot-caption">Each dot is the largest known witness for its modulus.
     A dot above the dashed line beats &radic;<span class="sqrt">N</span>.</p>
     <p class="plot-caption"><a href="/witnesses">Browse all witnesses &rarr;</a> &nbsp;&middot;&nbsp;
-    <a href="/recent">Recent activity &rarr;</a></p>
+    <a href="/recent">Recent activity &rarr;</a> &nbsp;&middot;&nbsp;
+    <a class="external nowrap" href="https://icarm.zulipchat.com/#narrow/channel/519875-general/topic/Ruzsa.20Genus.20One/near/614443028">Discuss on Zulip</a></p>
     <p class="plot-caption"><a class="nowrap" href="/database.json" download>Download all records (JSON) &darr;</a></p>
   </section>`
 }
