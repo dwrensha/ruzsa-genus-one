@@ -137,68 +137,118 @@ export interface RecordPoint {
   size: number
 }
 
-// Server-rendered log-log SVG scatter of record witness sizes r(N) against the
-// modulus N. Fixed frame spanning the whole allowed range, so the r = sqrt(N)
-// goal line always reads the same. No JS; tooltips via <title>.
-function witnessPlot(pts: RecordPoint[]): string {
-  const W = 720, H = 440, L = 56, R = 18, T = 18, B = 46
-  const plotW = W - L - R, plotH = H - T - B
-  const xmax = Math.log10(MAX_N) // ~4.7
-  // Scale y so the sqrt(N) goal line runs corner to corner.
-  const ymax = xmax / 2
-  const X = (logN: number) => L + (logN / xmax) * plotW
-  const Y = (logR: number) => T + plotH - (logR / ymax) * plotH
+// Server-rendered SVG scatters of the records against the modulus N. Both
+// views share a fixed 720x440 frame with a log10-N x-axis, so the sqrt(N)
+// goal always reads the same. No JS; tooltips via <title>.
+const PLOT = { W: 720, H: 440, L: 56, R: 18, T: 18, B: 46 }
+const INNER_W = PLOT.W - PLOT.L - PLOT.R
+const INNER_H = PLOT.H - PLOT.T - PLOT.B
+const LOG_NMAX = Math.log10(MAX_N) // ~4.7
+const plotX = (logN: number) => PLOT.L + (logN / LOG_NMAX) * INNER_W
 
-  // Decade gridlines and ticks; labels as powers of ten.
-  const pow10 = (k: number): string =>
-    k === 0 ? '1' : `10<tspan class="sup" dy="-5">${k}</tspan><tspan dy="5">&#8203;</tspan>`
+// Tick labels as powers of ten.
+const pow10 = (k: number): string =>
+  k === 0 ? '1' : `10<tspan class="sup" dy="-5">${k}</tspan><tspan dy="5">&#8203;</tspan>`
+
+// Decade gridlines and ticks for the shared x-axis.
+function xDecadeGrid(): string {
   let grid = ''
-  for (let k = 0; k <= Math.floor(xmax); k++) {
-    const x = X(k).toFixed(1)
-    if (k > 0) grid += `<line class="grid" x1="${x}" y1="${T}" x2="${x}" y2="${T + plotH}"/>`
-    grid += `<text class="tick" x="${x}" y="${T + plotH + 18}" text-anchor="middle">${pow10(k)}</text>`
+  for (let k = 0; k <= Math.floor(LOG_NMAX); k++) {
+    const x = plotX(k).toFixed(1)
+    if (k > 0) grid += `<line class="grid" x1="${x}" y1="${PLOT.T}" x2="${x}" y2="${PLOT.T + INNER_H}"/>`
+    grid += `<text class="tick" x="${x}" y="${PLOT.T + INNER_H + 18}" text-anchor="middle">${pow10(k)}</text>`
   }
+  return grid
+}
+
+// One record dot linking to its witness page; cy is view-specific.
+function recordDot(p: RecordPoint, cy: number): string {
+  const ratio = p.size / Math.sqrt(p.n)
+  const exponent = Math.log(p.size) / Math.log(p.n)
+  const beats = ratio > 1
+  return `<a href="/witness/${p.id}"><circle class="dot${beats ? ' beats-sqrt' : ''}" cx="${plotX(
+    Math.log10(p.n),
+  ).toFixed(1)}" cy="${cy.toFixed(1)}" r="${beats ? 4.5 : 3}"><title>N = ${p.n.toLocaleString(
+    'en-US',
+  )}: record |A| = ${p.size.toLocaleString('en-US')} (score ${ratio.toFixed(4)}, exponent ${exponent.toFixed(
+    4,
+  )})</title></circle></a>`
+}
+
+function plotSvg(ariaLabel: string, yTitle: string, body: string): string {
+  return `<svg class="records-plot" viewBox="0 0 ${PLOT.W} ${PLOT.H}" role="img" aria-label="${ariaLabel}">
+      ${body}
+      <line class="axis" x1="${PLOT.L}" y1="${PLOT.T}" x2="${PLOT.L}" y2="${PLOT.T + INNER_H}"/>
+      <line class="axis" x1="${PLOT.L}" y1="${PLOT.T + INNER_H}" x2="${PLOT.W - PLOT.R}" y2="${PLOT.T + INNER_H}"/>
+      <text class="axis-title" x="${PLOT.L + INNER_W / 2}" y="${PLOT.H - 6}" text-anchor="middle">modulus N &#8594;</text>
+      <text class="axis-title" transform="rotate(-90)" x="${-(PLOT.T + INNER_H / 2)}" y="15" text-anchor="middle">${yTitle}</text>
+    </svg>`
+}
+
+// Log-log view: record size r(N) against N. The y-scale is chosen so the
+// r = sqrt(N) goal line runs corner to corner.
+function sizePlot(pts: RecordPoint[]): string {
+  const ymax = LOG_NMAX / 2
+  const Y = (logR: number) => PLOT.T + INNER_H - (logR / ymax) * INNER_H
+
+  let grid = xDecadeGrid()
   for (let k = 0; k <= Math.floor(ymax); k++) {
     const y = Y(k).toFixed(1)
-    if (k > 0) grid += `<line class="grid" x1="${L}" y1="${y}" x2="${W - R}" y2="${y}"/>`
-    grid += `<text class="tick" x="${L - 8}" y="${(Y(k) + 4).toFixed(1)}" text-anchor="end">${pow10(k)}</text>`
+    if (k > 0) grid += `<line class="grid" x1="${PLOT.L}" y1="${y}" x2="${PLOT.W - PLOT.R}" y2="${y}"/>`
+    grid += `<text class="tick" x="${PLOT.L - 8}" y="${(Y(k) + 4).toFixed(1)}" text-anchor="end">${pow10(k)}</text>`
   }
 
-  // Guide line: the sqrt(N) barrier (log r = log N / 2), corner to corner.
-  // Its label runs along the line, nudged perpendicular so it doesn't overlap.
-  const lineAngle = (Math.atan2(-plotH, plotW) * 180) / Math.PI
-  const labelX = L + 0.85 * plotW, labelY = T + 0.15 * plotH
-  const sqrtLine = `<line class="guide guide-sqrt" x1="${X(0)}" y1="${Y(0)}" x2="${X(xmax).toFixed(1)}" y2="${Y(xmax / 2).toFixed(1)}"/>
+  // The sqrt(N) barrier (log r = log N / 2), corner to corner. Its label runs
+  // along the line, nudged perpendicular so it doesn't overlap.
+  const lineAngle = (Math.atan2(-INNER_H, INNER_W) * 180) / Math.PI
+  const labelX = PLOT.L + 0.85 * INNER_W, labelY = PLOT.T + 0.15 * INNER_H
+  const sqrtLine = `<line class="guide guide-sqrt" x1="${plotX(0)}" y1="${Y(0)}" x2="${plotX(LOG_NMAX).toFixed(1)}" y2="${Y(LOG_NMAX / 2).toFixed(1)}"/>
       <text class="guide-label" transform="rotate(${lineAngle.toFixed(1)} ${labelX.toFixed(1)} ${labelY.toFixed(1)})" x="${labelX.toFixed(1)}" y="${labelY.toFixed(1)}" dy="-7" text-anchor="end">r = &#8730;N</text>`
 
-  const dots = pts
-    .map((p) => {
-      const ratio = p.size / Math.sqrt(p.n)
-      const beats = ratio > 1
-      return `<a href="/witness/${p.id}"><circle class="dot${beats ? ' beats-sqrt' : ''}" cx="${X(
-        Math.log10(p.n),
-      ).toFixed(1)}" cy="${Y(Math.log10(p.size)).toFixed(1)}" r="${beats ? 4.5 : 3}"><title>N = ${p.n.toLocaleString(
-        'en-US',
-      )}: record |A| = ${p.size.toLocaleString('en-US')} (score ${(ratio).toFixed(4)})</title></circle></a>`
-    })
-    .join('\n      ')
+  const dots = pts.map((p) => recordDot(p, Y(Math.log10(p.size)))).join('\n      ')
+  return plotSvg(
+    'record witness size versus modulus, log-log scatter plot',
+    'record witness size r(N) &#8594;',
+    `${grid}\n      ${sqrtLine}\n      ${dots}`,
+  )
+}
 
-  return `<svg class="records-plot" viewBox="0 0 ${W} ${H}" role="img" aria-label="record witness size versus modulus, log-log scatter plot">
-      ${grid}
-      ${sqrtLine}
-      <line class="axis" x1="${L}" y1="${T}" x2="${L}" y2="${T + plotH}"/>
-      <line class="axis" x1="${L}" y1="${T + plotH}" x2="${W - R}" y2="${T + plotH}"/>
-      <text class="axis-title" x="${L + plotW / 2}" y="${H - 6}" text-anchor="middle">modulus N &#8594;</text>
-      <text class="axis-title" transform="rotate(-90)" x="${-(T + plotH / 2)}" y="15" text-anchor="middle">record witness size r(N) &#8594;</text>
-      ${dots}
-    </svg>`
+// Exponent view: log r(N) / log N against N, linear y from 0 to 1, so the
+// sqrt(N) barrier is the horizontal line at 1/2.
+function exponentPlot(pts: RecordPoint[]): string {
+  const Y = (v: number) => PLOT.T + INNER_H - v * INNER_H
+
+  let grid = xDecadeGrid()
+  for (const v of [0, 0.25, 0.75, 1]) {
+    const y = Y(v).toFixed(1)
+    if (v > 0) grid += `<line class="grid" x1="${PLOT.L}" y1="${y}" x2="${PLOT.W - PLOT.R}" y2="${y}"/>`
+    grid += `<text class="tick" x="${PLOT.L - 8}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${v}</text>`
+  }
+  grid += `<text class="tick" x="${PLOT.L - 8}" y="${(Y(0.5) + 4).toFixed(1)}" text-anchor="end">0.5</text>`
+
+  const sqrtLine = `<line class="guide guide-sqrt" x1="${PLOT.L}" y1="${Y(0.5)}" x2="${PLOT.W - PLOT.R}" y2="${Y(0.5)}"/>
+      <text class="guide-label" x="${PLOT.W - PLOT.R - 8}" y="${(Y(0.5) - 8).toFixed(1)}" text-anchor="end">r = &#8730;N</text>`
+
+  const dots = pts.map((p) => recordDot(p, Y(Math.log(p.size) / Math.log(p.n)))).join('\n      ')
+  return plotSvg(
+    'exponent log r over log N versus modulus scatter plot',
+    'exponent log r(N) / log N &#8594;',
+    `${grid}\n      ${sqrtLine}\n      ${dots}`,
+  )
 }
 
 function recordsSection(records: RecordPoint[]): string {
   const inner =
     records.length === 0
       ? '<p class="muted">No record witnesses yet &mdash; submit a valid set to put the first dot on the board.</p>'
-      : witnessPlot(records)
+      : `<input class="plot-radio" type="radio" name="records-plot" id="plot-size" checked>
+    <input class="plot-radio" type="radio" name="records-plot" id="plot-exponent">
+    <div class="plot-tabs">
+      <label for="plot-size">record size r(N)</label>
+      <label for="plot-exponent">exponent log&thinsp;r&thinsp;/&thinsp;log&thinsp;N</label>
+    </div>
+    <div class="plot-panel plot-panel-size">${sizePlot(records)}</div>
+    <div class="plot-panel plot-panel-exponent">${exponentPlot(records)}</div>`
   return `
   <section class="panel records">
     <h2>Records</h2>
