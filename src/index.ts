@@ -138,7 +138,12 @@ app.get('/witnesses', async (c) =>
   c.html(
     witnessesPage(
       await allWitnesses(c.env),
-      { sort: c.req.query('sort'), dir: c.req.query('dir'), current: c.req.query('current') },
+      {
+        sort: c.req.query('sort'),
+        dir: c.req.query('dir'),
+        current: c.req.query('current'),
+        n: c.req.query('n'),
+      },
       c.get('user'),
     ),
   ),

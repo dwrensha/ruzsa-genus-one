@@ -344,6 +344,13 @@ var {
 
 .table-controls {
   font-size: 0.9rem;
+  margin: 0.7rem 0;
+}
+
+.modulus-filter input {
+  width: 6rem;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.9rem;
 }
 
 .inline-form {

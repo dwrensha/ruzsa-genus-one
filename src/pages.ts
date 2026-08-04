@@ -636,7 +636,7 @@ export function witnessDetailPage(
       ${justRecorded ? `<p class="record-new">New record: the largest known witness for N = ${w.n.toLocaleString('en-US')}. Saved. 🏅</p>` : ''}
       <h2>witness #${w.id}</h2>
       <dl class="stats">
-        <div><dt>N</dt><dd>${w.n.toLocaleString('en-US')}</dd></div>
+        <div><dt>N</dt><dd><a href="/witnesses?n=${w.n}" title="all record witnesses for this modulus">${w.n.toLocaleString('en-US')}</a></dd></div>
         <div><dt>|A|</dt><dd>${w.size.toLocaleString('en-US')}</dd></div>
         <div><dt>score |A|/&radic;<span class="sqrt">N</span></dt><dd class="score">${w.ratio.toFixed(4)}</dd></div>
         <div><dt>exponent log&thinsp;|A|&thinsp;/&thinsp;log&thinsp;N</dt><dd class="score">${(
@@ -778,7 +778,7 @@ const WITNESS_SORT_DEFAULT_DIR: Record<WitnessSortKey, 'asc' | 'desc'> = {
 
 export function witnessesPage(
   rows: WitnessListRow[],
-  query: { sort?: string; dir?: string; current?: string },
+  query: { sort?: string; dir?: string; current?: string; n?: string },
   user: User | null = null,
 ): string {
   const sort: WitnessSortKey = (WITNESS_SORT_KEYS as readonly string[]).includes(query.sort ?? '')
@@ -787,6 +787,7 @@ export function witnessesPage(
   const dir: 'asc' | 'desc' =
     query.dir === 'asc' || query.dir === 'desc' ? query.dir : WITNESS_SORT_DEFAULT_DIR[sort]
   const currentOnly = query.current === '1'
+  const nFilter = /^\d+$/.test(query.n ?? '') ? Number(query.n) : null
 
   const exponent = (w: WitnessListRow) => Math.log(w.size) / Math.log(w.n)
   const keyValue: Record<WitnessSortKey, (w: WitnessListRow) => number | string> = {
@@ -798,7 +799,9 @@ export function witnessesPage(
     date: (w) => w.created_at,
   }
 
-  const shown = currentOnly ? rows.filter((r) => r.is_current) : rows.slice()
+  const shown = rows.filter(
+    (r) => (!currentOnly || r.is_current) && (nFilter === null || r.n === nFilter),
+  )
   const val = keyValue[sort]
   const flip = dir === 'desc' ? -1 : 1
   shown.sort((a, b) => {
@@ -807,13 +810,19 @@ export function witnessesPage(
     return cmp !== 0 ? cmp * flip : a.n - b.n || a.size - b.size
   })
 
-  const href = (s: WitnessSortKey, d: 'asc' | 'desc', current: boolean): string => {
+  const href = (
+    s: WitnessSortKey,
+    d: 'asc' | 'desc',
+    current: boolean,
+    n: number | null = nFilter,
+  ): string => {
     const q = new URLSearchParams()
     if (!(s === 'n' && d === 'asc')) {
       q.set('sort', s)
       q.set('dir', d)
     }
     if (current) q.set('current', '1')
+    if (n !== null) q.set('n', String(n))
     const qs = q.toString()
     return '/witnesses' + (qs ? '?' + qs : '')
   }
@@ -831,7 +840,7 @@ export function witnessesPage(
     .map(
       (w) => `<tr>
         <td><a href="/witness/${w.id}">#${w.id}</a></td>
-        <td class="num">${w.n.toLocaleString('en-US')}</td>
+        <td class="num"><a href="${href(sort, dir, currentOnly, w.n)}" title="show only N = ${w.n.toLocaleString('en-US')}">${w.n.toLocaleString('en-US')}</a></td>
         <td class="num">${w.size.toLocaleString('en-US')}</td>
         <td class="num">${w.ratio.toFixed(4)}</td>
         <td class="num">${exponent(w).toFixed(4)}</td>
@@ -845,7 +854,23 @@ export function witnessesPage(
   const filterToggle = currentOnly
     ? `<a href="${href(sort, dir, false)}">all</a> &middot; <strong>current records only</strong>`
     : `<strong>all</strong> &middot; <a href="${href(sort, dir, true)}">current records only</a>`
-  const heading = currentOnly ? 'Current record witnesses' : 'All witnesses'
+  // The modulus filter is a plain GET form (the page has no JS); hidden inputs
+  // mirror href() so submitting preserves the sort and current-only state.
+  const hiddenState =
+    (sort === 'n' && dir === 'asc'
+      ? ''
+      : `<input type="hidden" name="sort" value="${sort}"><input type="hidden" name="dir" value="${dir}">`) +
+    (currentOnly ? '<input type="hidden" name="current" value="1">' : '')
+  const modulusFilter =
+    `<form class="inline-form modulus-filter" method="get" action="/witnesses">${hiddenState}` +
+    `<label>N&nbsp;=&nbsp;<input name="n" type="number" min="2" max="50000" step="1" ` +
+    `value="${nFilter ?? ''}" placeholder="any"></label> ` +
+    `<button class="link-button" type="submit">filter</button></form>` +
+    (nFilter === null
+      ? ''
+      : ` &middot; <a href="${href(sort, dir, currentOnly, null)}">clear</a>`)
+  const nLabel = nFilter === null ? '' : ` for N = ${nFilter.toLocaleString('en-US')}`
+  const heading = (currentOnly ? 'Current record witnesses' : 'All witnesses') + nLabel
 
   const body = `
     <section class="prose">
@@ -854,9 +879,10 @@ export function witnessesPage(
       <p class="muted">Every record-setting witness ever submitted; a superseded row was the
       record for its modulus until a larger set beat it. Click a column header to sort; click
       again to reverse.</p>
-      <p class="table-controls muted">showing ${shown.length} of ${rows.length} witnesses
+      <div class="table-controls muted">showing ${shown.length} of ${rows.length} witnesses
         &nbsp;&middot;&nbsp; ${filterToggle}
-        &nbsp;&middot;&nbsp; <a href="/database.json" download>Download (JSON) &darr;</a></p>
+        &nbsp;&middot;&nbsp; ${modulusFilter}
+        &nbsp;&middot;&nbsp; <a href="/database.json" download>Download (JSON) &darr;</a></div>
       <div class="table-scroll">
       <table class="tokens-table witnesses-table">
         <thead><tr>
