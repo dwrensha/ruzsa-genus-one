@@ -213,22 +213,27 @@ function sizePlot(pts: RecordPoint[]): string {
   )
 }
 
-// Exponent view: log r(N) / log N against N, linear y from 0 to 1/2, so the
-// sqrt(N) barrier is the horizontal line along the top edge.
+// Exponent view: log r(N) / log N against N, linear y from 0.35 to 1/2, so
+// the sqrt(N) barrier is the horizontal line along the top edge. Weak records
+// below the window are simply cut off.
 function exponentPlot(pts: RecordPoint[]): string {
-  const Y = (v: number) => PLOT.T + INNER_H - (v / 0.5) * INNER_H
+  const ymin = 0.35, ymax = 0.5
+  const Y = (v: number) => PLOT.T + INNER_H - ((v - ymin) / (ymax - ymin)) * INNER_H
 
   let grid = xDecadeGrid()
-  for (const v of [0, 0.1, 0.2, 0.3, 0.4, 0.5]) {
+  for (const v of [0.35, 0.4, 0.45, 0.5]) {
     const y = Y(v).toFixed(1)
-    if (v > 0 && v < 0.5) grid += `<line class="grid" x1="${PLOT.L}" y1="${y}" x2="${PLOT.W - PLOT.R}" y2="${y}"/>`
+    if (v > ymin && v < ymax) grid += `<line class="grid" x1="${PLOT.L}" y1="${y}" x2="${PLOT.W - PLOT.R}" y2="${y}"/>`
     grid += `<text class="tick" x="${PLOT.L - 8}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${v}</text>`
   }
 
   const sqrtLine = `<line class="guide guide-sqrt" x1="${PLOT.L}" y1="${Y(0.5)}" x2="${PLOT.W - PLOT.R}" y2="${Y(0.5)}"/>
       <text class="guide-label" x="${PLOT.W - PLOT.R - 8}" y="${(Y(0.5) + 16).toFixed(1)}" text-anchor="end">r = &#8730;N</text>`
 
-  const dots = pts.map((p) => recordDot(p, Y(Math.log(p.size) / Math.log(p.n)))).join('\n      ')
+  const dots = pts
+    .filter((p) => Math.log(p.size) / Math.log(p.n) >= ymin)
+    .map((p) => recordDot(p, Y(Math.log(p.size) / Math.log(p.n))))
+    .join('\n      ')
   return plotSvg(
     'exponent log r over log N versus modulus scatter plot',
     'exponent log r(N) / log N &#8594;',
