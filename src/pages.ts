@@ -97,7 +97,7 @@ export function layout(title: string, bodyInner: string, user: User | null = nul
       <div class="inner">
         <nav class="footer-links">
           <a href="/api">API</a> &nbsp;&middot;&nbsp;
-          <a class="external" href="https://github.com/dwrensha/ruzsa-genus-one">source</a> &nbsp;&middot;&nbsp;
+          <a class="external" href="https://github.com/icarm/ruzsa-genus-one">source</a> &nbsp;&middot;&nbsp;
           <a class="external" href="https://icarm.io">icarm.io</a>
         </nav>
         <p class="acknowledgment">This website is maintained by the NSF Institute for Computer-Aided
