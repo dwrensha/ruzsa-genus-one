@@ -151,19 +151,22 @@ export interface RecordPoint {
 const PLOT = { W: 720, H: 440, L: 56, R: 18, T: 18, B: 46 }
 const INNER_W = PLOT.W - PLOT.L - PLOT.R
 const INNER_H = PLOT.H - PLOT.T - PLOT.B
+const LOG_NMIN = Math.log10(2) // N = 2 is the smallest valid modulus
 const LOG_NMAX = Math.log10(MAX_N) // ~4.7
-const plotX = (logN: number) => PLOT.L + (logN / LOG_NMAX) * INNER_W
+const plotX = (logN: number) =>
+  PLOT.L + ((logN - LOG_NMIN) / (LOG_NMAX - LOG_NMIN)) * INNER_W
 
 // Tick labels as powers of ten.
 const pow10 = (k: number): string =>
   k === 0 ? '1' : `10<tspan class="sup" dy="-5">${k}</tspan><tspan dy="5">&#8203;</tspan>`
 
-// Decade gridlines and ticks for the shared x-axis.
+// Decade gridlines and ticks for the shared x-axis, plus a tick for N = 2 at
+// the left edge (the axis line itself, so no gridline).
 function xDecadeGrid(): string {
-  let grid = ''
-  for (let k = 0; k <= Math.floor(LOG_NMAX); k++) {
+  let grid = `<text class="tick" x="${PLOT.L}" y="${PLOT.T + INNER_H + 18}" text-anchor="middle">2</text>`
+  for (let k = 1; k <= Math.floor(LOG_NMAX); k++) {
     const x = plotX(k).toFixed(1)
-    if (k > 0) grid += `<line class="grid" x1="${x}" y1="${PLOT.T}" x2="${x}" y2="${PLOT.T + INNER_H}"/>`
+    grid += `<line class="grid" x1="${x}" y1="${PLOT.T}" x2="${x}" y2="${PLOT.T + INNER_H}"/>`
     grid += `<text class="tick" x="${x}" y="${PLOT.T + INNER_H + 18}" text-anchor="middle">${pow10(k)}</text>`
   }
   return grid
@@ -206,11 +209,13 @@ function sizePlot(pts: RecordPoint[]): string {
     grid += `<text class="tick" x="${PLOT.L - 8}" y="${(Y(k) + 4).toFixed(1)}" text-anchor="end">${pow10(k)}</text>`
   }
 
-  // The sqrt(N) barrier (log r = log N / 2), corner to corner. Its label runs
-  // along the line, nudged perpendicular so it doesn't overlap.
-  const lineAngle = (Math.atan2(-INNER_H, INNER_W) * 180) / Math.PI
-  const labelX = PLOT.L + 0.85 * INNER_W, labelY = PLOT.T + 0.15 * INNER_H
-  const sqrtLine = `<line class="guide guide-sqrt" x1="${plotX(0)}" y1="${Y(0)}" x2="${plotX(LOG_NMAX).toFixed(1)}" y2="${Y(LOG_NMAX / 2).toFixed(1)}"/>
+  // The sqrt(N) barrier (log r = log N / 2), spanning the full x-range. Its
+  // label runs along the line, nudged perpendicular so it doesn't overlap.
+  const gx1 = plotX(LOG_NMIN), gy1 = Y(LOG_NMIN / 2)
+  const gx2 = plotX(LOG_NMAX), gy2 = Y(LOG_NMAX / 2)
+  const lineAngle = (Math.atan2(gy2 - gy1, gx2 - gx1) * 180) / Math.PI
+  const labelX = gx1 + 0.85 * (gx2 - gx1), labelY = gy1 + 0.85 * (gy2 - gy1)
+  const sqrtLine = `<line class="guide guide-sqrt" x1="${gx1.toFixed(1)}" y1="${gy1.toFixed(1)}" x2="${gx2.toFixed(1)}" y2="${gy2.toFixed(1)}"/>
       <text class="guide-label" transform="rotate(${lineAngle.toFixed(1)} ${labelX.toFixed(1)} ${labelY.toFixed(1)})" x="${labelX.toFixed(1)}" y="${labelY.toFixed(1)}" dy="-7" text-anchor="end">|A| = &#8730;N</text>`
 
   const dots = pts.map((p) => recordDot(p, Y(Math.log10(p.size)))).join('\n      ')

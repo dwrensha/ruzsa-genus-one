@@ -27,19 +27,20 @@ const L = 96, R = 48, T = 128, B = 84
 const INNER_W = W - L - R
 const INNER_H = H - T - B
 const MAX_N = 50_000
+const LOG_NMIN = Math.log10(2) // N = 2 is the smallest valid modulus
 const LOG_NMAX = Math.log10(MAX_N)
 const YMIN = 0.35, YMAX = 0.5
 
-const X = (logN) => L + (logN / LOG_NMAX) * INNER_W
+const X = (logN) => L + ((logN - LOG_NMIN) / (LOG_NMAX - LOG_NMIN)) * INNER_W
 const Y = (v) => T + INNER_H - ((v - YMIN) / (YMAX - YMIN)) * INNER_H
 
 const pow10 = (k) =>
   k === 0 ? '1' : `10<tspan font-size="15" dy="-8">${k}</tspan>`
 
-let grid = ''
-for (let k = 0; k <= Math.floor(LOG_NMAX); k++) {
+let grid = `<text fill="${MUTED}" font-size="21" x="${L}" y="${T + INNER_H + 30}" text-anchor="middle">2</text>`
+for (let k = 1; k <= Math.floor(LOG_NMAX); k++) {
   const x = X(k).toFixed(1)
-  if (k > 0) grid += `<line stroke="${EDGE}" x1="${x}" y1="${T}" x2="${x}" y2="${T + INNER_H}"/>`
+  grid += `<line stroke="${EDGE}" x1="${x}" y1="${T}" x2="${x}" y2="${T + INNER_H}"/>`
   grid += `<text fill="${MUTED}" font-size="21" x="${x}" y="${T + INNER_H + 30}" text-anchor="middle">${pow10(k)}</text>`
 }
 for (const v of [0.35, 0.4, 0.45, 0.5]) {
