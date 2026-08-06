@@ -526,6 +526,13 @@ const provider = new OAuthProvider<Bindings>({
   authorizeEndpoint: '/oauth/authorize',
   tokenEndpoint: '/oauth/token',
   scopesSupported: ['submit'],
+  // Long-lived tokens: the connector is low-stakes (additive submissions to a
+  // public leaderboard, attributed to the grantee) and short TTLs just cause
+  // re-auth friction in clients. Refresh outlives access by 60 days so a
+  // client that refreshes only at access-token expiry never finds its refresh
+  // token already dead.
+  accessTokenTTL: 30 * 24 * 60 * 60,
+  refreshTokenTTL: 90 * 24 * 60 * 60,
   // Preferred registration path for MCP clients (2026 spec); DCR kept for
   // compatibility with clients that predate CIMD.
   // CIMD is deliberately OFF: workers-oauth-provider (as of 0.10.1) only
