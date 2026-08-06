@@ -30,6 +30,13 @@ solution-free set — with score |A|/√N > 1.
 - **JSON API** (`POST /api/verify`, bearer tokens managed on the profile
   page) and a full database download (`GET /database.json`). Docs at
   [/api](https://ruzsa-genus-one.icarm.cloud/api).
+- **MCP server** (`/mcp`): a remote Model Context Protocol endpoint so AI
+  chat clients (Claude.ai custom connectors, ChatGPT, Claude Code, …) can
+  verify and submit witnesses mid-conversation. Tools: `list_records`,
+  `get_record`, `verify_witness`, `submit_witness`. Auth is OAuth
+  (`@cloudflare/workers-oauth-provider`) with consent at `/oauth/authorize`,
+  delegating identity to the same GitHub login as the site; submissions are
+  attributed to the connected account.
 
 ## Architecture
 
@@ -37,6 +44,12 @@ solution-free set — with score |A|/√N > 1.
 [Hono](https://hono.dev). Users, witnesses, commentary, and API tokens live
 in D1 (`migrations/`); login sessions and post-submit result flashes live in
 KV. Session cookies and API tokens are stored only as SHA-256 hashes.
+
+The worker's default export is an `OAuthProvider` wrapper: it owns `/mcp`
+(bearer-token validation → the MCP handler in `src/mcp.ts`), `/oauth/token`,
+`/oauth/register`, and the `/.well-known` OAuth metadata; everything else
+falls through to the Hono app, including the `/oauth/authorize` consent
+screen. OAuth grants/tokens live in a dedicated KV namespace (`OAUTH_KV`).
 
 ## Development
 

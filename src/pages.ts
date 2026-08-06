@@ -573,6 +573,18 @@ export function apiDocsPage(user: User | null = null): string {
       list, <code>submitter</code>, <code>created_at</code>, and <code>current</code> (false for
       superseded records, which are kept as history). No auth required. Responses carry a strong
       <code>ETag</code>; conditional requests return <code>304</code> when nothing has changed.</p>
+
+      <h3>MCP server: <code>/mcp</code></h3>
+      <p>The site is also a remote <a class="external"
+      href="https://modelcontextprotocol.io">Model Context Protocol</a> server, so AI chat clients
+      can verify and submit witnesses mid-conversation. Add
+      <code>https://ruzsa-genus-one.icarm.cloud/mcp</code> as a custom connector (Claude.ai:
+      Settings &rarr; Connectors; ChatGPT: developer-mode connectors; also works with Claude Code,
+      MCP Inspector, and other MCP clients). The connector flow signs you in with GitHub &mdash;
+      the same account as the website &mdash; and record submissions are attributed to you.</p>
+      <p>Tools: <code>list_records</code>, <code>get_record</code> (one modulus, with elements),
+      <code>verify_witness</code>, and <code>submit_witness</code>. Verification and submission
+      share the per-account rate limit.</p>
     </section>`
   return layout(`API — ${SITE_NAME}`, body, user)
 }
@@ -928,6 +940,37 @@ export function acknowledgePage(user: User | null = null): string {
       </ul>
     </section>`
   return layout(`Acknowledgement — ${SITE_NAME}`, body, user)
+}
+
+/**
+ * OAuth consent screen for MCP clients. The original authorization query
+ * string rides along in a hidden field so the POST can re-validate it.
+ */
+export function consentPage(
+  user: User,
+  clientName: string,
+  redirectHost: string,
+  query: string,
+): string {
+  const name = escapeHtml(user.display_name || user.email || 'user')
+  const client = escapeHtml(clientName)
+  const body = `
+    <section class="prose">
+      <h2>Authorize ${client}?</h2>
+      <p><strong>${client}</strong> (redirecting to <code>${escapeHtml(redirectHost)}</code>)
+      wants to connect to ${escapeHtml(SITE_NAME)} as <strong>${name}</strong>.</p>
+      <p>If you approve, it will be able to verify candidate sets and submit record
+      witnesses attributed to your account. It will not be able to manage your API
+      tokens, edit your profile, or log in as you on this site. You can revoke access
+      any time by disconnecting it on the client&rsquo;s side.</p>
+      <form method="post" action="/oauth/authorize">
+        <input type="hidden" name="query" value="${escapeHtml(query)}" />
+        <button type="submit" name="decision" value="approve">Approve</button>
+        &nbsp;
+        <button type="submit" name="decision" value="deny">Deny</button>
+      </form>
+    </section>`
+  return layout(`Authorize ${clientName} — ${SITE_NAME}`, body, user)
 }
 
 export function notFoundPage(user: User | null = null): string {

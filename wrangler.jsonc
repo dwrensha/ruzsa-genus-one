@@ -23,8 +23,16 @@
     {
       "binding": "SESSIONS",
       "id": "fb174c11f72841c3b525995541d53cf0"
+    },
+    {
+      // OAuth grants/tokens for the MCP endpoint (@cloudflare/workers-oauth-provider).
+      "binding": "OAUTH_KV",
+      "id": "f0772db84c0c470aa2eee6622fb57f81"
     }
   ],
+  // Required by clientIdMetadataDocumentEnabled (CIMD client registration):
+  // makes outbound fetch refuse private-network destinations (SSRF guard).
+  "compatibility_flags": ["global_fetch_strictly_public"],
   "ratelimits": [
     {
       "name": "SUBMISSION_RATE_LIMITER",

@@ -3,6 +3,7 @@
 // so a dump of the KV store does not reveal usable session cookies. (API
 // tokens are likewise stored only as sha256 hashes in D1.)
 
+import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider'
 import type { Context } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import type { User } from './pages'
@@ -11,6 +12,10 @@ export interface Bindings {
   DB: D1Database
   SESSIONS: KVNamespace
   SUBMISSION_RATE_LIMITER: RateLimit
+  /** Grant/token storage for the MCP OAuth provider (see index.ts). */
+  OAUTH_KV: KVNamespace
+  /** Injected by the OAuthProvider wrapper — not a wrangler binding. */
+  OAUTH_PROVIDER: OAuthHelpers
   GITHUB_CLIENT_ID?: string
   GITHUB_CLIENT_SECRET?: string
 }

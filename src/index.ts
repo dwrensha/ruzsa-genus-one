@@ -1,9 +1,16 @@
+import {
+  AuthorizationError,
+  OAuthProvider,
+  type AuthRequest,
+} from '@cloudflare/workers-oauth-provider'
 import { Hono } from 'hono'
+import { mcpApiHandler, type McpProps } from './mcp'
 import {
   acknowledgePage,
   activityPage,
   apiDocsPage,
   commentaryHistoryPage,
+  consentPage,
   landingPage,
   notFoundPage,
   profilePage,
@@ -14,6 +21,7 @@ import {
 } from './pages'
 import {
   type AppEnv,
+  type Bindings,
   generateApiToken,
   loadCurrentUser,
   loadUserFromToken,
@@ -369,6 +377,114 @@ app.post('/api/verify', async (c) => {
   return c.json(record ? { ...rest, record } : rest)
 })
 
+// ---------------------------------------------------------------------------
+// OAuth authorization endpoint for MCP clients (Claude.ai, ChatGPT, etc.).
+//
+// The OAuthProvider wrapper (bottom of this file) owns the token, metadata,
+// and registration endpoints and validates bearer tokens on /mcp. This
+// endpoint is the one piece it delegates to the application: authenticate the
+// user (via the existing GitHub-backed session) and ask for consent.
+
+// An OAuth error redirect back to the client, per the provider README: only
+// safe when parseAuthRequest attached a redirectUri (client + URI validated).
+function oauthErrorRedirect(
+  redirectUri: string,
+  code: string,
+  description: string,
+  state?: string | null,
+  issuer?: string | null,
+): Response {
+  const redirect = new URL(redirectUri)
+  redirect.searchParams.set('error', code)
+  redirect.searchParams.set('error_description', description)
+  if (state) redirect.searchParams.set('state', state)
+  if (issuer) redirect.searchParams.set('iss', issuer)
+  return Response.redirect(redirect.toString(), 302)
+}
+
+app.get('/oauth/authorize', async (c) => {
+  let oauthRequest: AuthRequest
+  try {
+    oauthRequest = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw)
+  } catch (error) {
+    if (!(error instanceof AuthorizationError)) throw error
+    if (!error.redirectUri) return c.text(error.description, 400)
+    return oauthErrorRedirect(
+      error.redirectUri,
+      error.code,
+      error.description,
+      error.state,
+      error.issuer,
+    )
+  }
+  const user = c.get('user')
+  if (!user) {
+    const url = new URL(c.req.url)
+    const returnTo = encodeURIComponent(url.pathname + url.search)
+    return c.redirect(`/auth/github?return_to=${returnTo}`, 302)
+  }
+  const client = await c.env.OAUTH_PROVIDER.lookupClient(oauthRequest.clientId)
+  if (!client) return c.text('Unknown OAuth client', 400)
+  const clientName = client.clientName || oauthRequest.clientId
+  const redirectHost = new URL(oauthRequest.redirectUri).host
+  const query = new URL(c.req.url).search.slice(1)
+  return c.html(consentPage(user, clientName, redirectHost, query))
+})
+
+app.post('/oauth/authorize', async (c) => {
+  const user = c.get('user')
+  if (!user) return c.text('Session expired — please retry from the client.', 401)
+  const form = await c.req.parseBody()
+  if (typeof form.query !== 'string' || typeof form.decision !== 'string') {
+    return c.text('malformed consent form', 400)
+  }
+  // Re-parse the original authorization query rather than trusting hidden
+  // fields for individual OAuth parameters; parseAuthRequest re-validates
+  // the client, redirect URI, and PKCE from scratch.
+  const synthetic = new Request(`${new URL(c.req.url).origin}/oauth/authorize?${form.query}`)
+  let oauthRequest: AuthRequest
+  try {
+    oauthRequest = await c.env.OAUTH_PROVIDER.parseAuthRequest(synthetic)
+  } catch (error) {
+    if (!(error instanceof AuthorizationError)) throw error
+    return c.text(error.description, 400)
+  }
+  if (form.decision !== 'approve') {
+    return oauthErrorRedirect(
+      oauthRequest.redirectUri,
+      'access_denied',
+      'The user denied the authorization request.',
+      oauthRequest.state,
+      oauthRequest.issuer,
+    )
+  }
+  const client = await c.env.OAUTH_PROVIDER.lookupClient(oauthRequest.clientId)
+  const props: McpProps = { userId: user.id, displayName: user.display_name ?? null }
+  const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
+    request: oauthRequest,
+    userId: String(user.id),
+    metadata: { clientName: client?.clientName ?? null },
+    scope: oauthRequest.scope,
+    props,
+  })
+  return c.redirect(redirectTo, 302)
+})
+
 app.notFound((c) => c.html(notFoundPage(c.get('user')), 404))
 
-export default app
+// The provider owns /mcp (bearer-token validation → mcpApiHandler),
+// /oauth/token, /oauth/register, and the /.well-known metadata endpoints.
+// Everything else — the site, plus /oauth/authorize above — falls through to
+// the Hono app.
+export default new OAuthProvider<Bindings>({
+  apiRoute: '/mcp',
+  apiHandler: mcpApiHandler,
+  defaultHandler: { fetch: (req, env, ctx) => app.fetch(req, env, ctx) },
+  authorizeEndpoint: '/oauth/authorize',
+  tokenEndpoint: '/oauth/token',
+  scopesSupported: ['submit'],
+  // Preferred registration path for MCP clients (2026 spec); DCR kept for
+  // compatibility with clients that predate CIMD.
+  clientIdMetadataDocumentEnabled: true,
+  clientRegistrationEndpoint: '/oauth/register',
+})

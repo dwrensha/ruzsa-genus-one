@@ -1,0 +1,183 @@
+// MCP endpoint: exposes verification and record submission as tools for MCP
+// clients (Claude.ai custom connectors, ChatGPT connectors, MCP-aware CLIs).
+//
+// Auth is handled by the OAuthProvider wrapper in index.ts: it validates the
+// bearer token before this handler runs and delivers the authenticated user
+// via ctx.props (the props stored at authorization time in /oauth/authorize).
+// The handler itself never sees or parses tokens.
+
+import { createMcpHandler, McpServer } from '@modelcontextprotocol/server'
+import * as z from 'zod'
+import type { Bindings } from './auth'
+import { checkSubmissionRateLimit } from './rateLimit'
+import { currentRecordForModulus, currentRecords, recordWitness } from './store'
+import { MAX_N, MAX_SET_SIZE, verify } from './verify'
+
+/** Stored in the OAuth grant at consent time; decrypted into ctx.props. */
+export interface McpProps extends Record<string, unknown> {
+  userId: number
+  displayName: string | null
+}
+
+const PROBLEM_BLURB =
+  `Ruzsa's genus-one problem: fix a modulus N and find a large subset A of Z/NZ ` +
+  `with no nontrivial solutions to a + 3b ≡ 2c + 2d (mod N) — nontrivial meaning ` +
+  `not all of a, b, c, d equal. The score for a valid set is |A|/√N; the site ` +
+  `records the largest known valid set for each N. Limits: 2 ≤ N ≤ ${MAX_N}, ` +
+  `|A| ≤ ${MAX_SET_SIZE}.`
+
+const setInputSchema = z.object({
+  n: z.number().int().describe(`The modulus N (2 ≤ N ≤ ${MAX_N}).`),
+  elements: z
+    .array(z.number().int())
+    .describe(
+      `The elements of A as integers (reduced mod N on the server; duplicates after reduction are rejected). At most ${MAX_SET_SIZE} elements.`,
+    ),
+})
+
+function jsonResult(payload: unknown, isError = false) {
+  return {
+    content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
+    isError,
+  }
+}
+
+// Both verification and submission run the O(|A|²) check, so both draw from
+// the same per-user rate-limit budget as web and API submissions.
+async function rateLimited(env: Bindings, userId: number) {
+  const rate = await checkSubmissionRateLimit(env, userId)
+  if (rate.allowed) return null
+  return jsonResult(
+    {
+      ok: false,
+      error: `rate limit exceeded: ${rate.limit} verifications per ${rate.retryAfter} seconds; retry in about ${rate.retryAfter} seconds`,
+    },
+    true,
+  )
+}
+
+function buildServer(env: Bindings, props: McpProps): McpServer {
+  const server = new McpServer({ name: 'ruzsa-genus-one', version: '1.0.0' })
+
+  server.registerTool(
+    'list_records',
+    {
+      title: 'List current records',
+      description:
+        `List the current record witness for every modulus that has one. ${PROBLEM_BLURB} ` +
+        `Returns one entry per modulus: the record size, the score (size/√N), and the witness id. ` +
+        `Use get_record to fetch a record's elements.`,
+      inputSchema: z.object({}),
+    },
+    async () => {
+      const records = await currentRecords(env)
+      return jsonResult({
+        count: records.length,
+        records: records.map((r) => ({
+          n: r.n,
+          size: r.size,
+          ratio: r.size / Math.sqrt(r.n),
+          witnessId: r.id,
+          url: `https://ruzsa-genus-one.icarm.cloud/witness/${r.id}`,
+        })),
+      })
+    },
+  )
+
+  server.registerTool(
+    'get_record',
+    {
+      title: 'Get the record for a modulus',
+      description:
+        `Fetch the current record witness for one modulus N, including its full element list — ` +
+        `useful as a starting point for constructing something larger. Returns null when no ` +
+        `witness has been recorded for that N yet.`,
+      inputSchema: z.object({
+        n: z.number().int().describe(`The modulus N (2 ≤ N ≤ ${MAX_N}).`),
+      }),
+    },
+    async ({ n }) => {
+      const record = await currentRecordForModulus(env, n)
+      if (!record) return jsonResult({ n, record: null })
+      return jsonResult({
+        n,
+        record: {
+          witnessId: record.id,
+          size: record.size,
+          ratio: record.ratio,
+          elements: JSON.parse(record.elements) as number[],
+          submitter: record.submitter,
+          created_at: record.created_at,
+          url: `https://ruzsa-genus-one.icarm.cloud/witness/${record.id}`,
+        },
+      })
+    },
+  )
+
+  server.registerTool(
+    'verify_witness',
+    {
+      title: 'Verify a candidate set',
+      description:
+        `Check whether a set A is solution-free for a + 3b ≡ 2c + 2d (mod N), without ` +
+        `submitting it. ${PROBLEM_BLURB} Returns valid/invalid, the size and score, and a ` +
+        `concrete counterexample (a, b, c, d) when invalid.`,
+      inputSchema: setInputSchema,
+    },
+    async ({ n, elements }) => {
+      const limited = await rateLimited(env, props.userId)
+      if (limited) return limited
+      const result = verify(n, elements)
+      if (!result.ok) return jsonResult(result, true)
+      // The reduced element list is redundant for tool output (the caller
+      // already has the set); dropping it keeps responses small.
+      const { elements: _elements, ...rest } = result
+      return jsonResult(rest)
+    },
+  )
+
+  server.registerTool(
+    'submit_witness',
+    {
+      title: 'Submit a witness',
+      description:
+        `Verify a set A and, when it is valid and strictly larger than the current record ` +
+        `for its modulus, record it as the new record attributed to the authenticated user ` +
+        `(${props.displayName ?? 'unnamed user'}). Anything else — invalid, or valid but not ` +
+        `record-setting — is reported but not stored. Verify locally with verify_witness ` +
+        `first if unsure; both tools share the submission rate limit.`,
+      inputSchema: setInputSchema,
+    },
+    async ({ n, elements }) => {
+      const limited = await rateLimited(env, props.userId)
+      if (limited) return limited
+      const result = verify(n, elements)
+      if (!result.ok) return jsonResult(result, true)
+      const { elements: _elements, ...rest } = result
+      if (!result.valid) return jsonResult(rest)
+      const record = await recordWitness(env, result, props.userId)
+      return jsonResult({
+        ...rest,
+        record,
+        ...(record.recorded
+          ? { url: `https://ruzsa-genus-one.icarm.cloud/witness/${record.witnessId}` }
+          : {}),
+      })
+    },
+  )
+
+  return server
+}
+
+// The OAuthProvider invokes this like an ExportedHandler, with the grant's
+// props on ctx. A fresh handler per request keeps concurrent requests from
+// sharing any state; construction is cheap and the transport is stateless.
+export const mcpApiHandler = {
+  fetch(request: Request, env: Bindings, ctx: ExecutionContext): Promise<Response> {
+    const props = ctx.props as McpProps | undefined
+    if (!props || typeof props.userId !== 'number') {
+      return Promise.resolve(Response.json({ error: 'unauthorized' }, { status: 401 }))
+    }
+    return createMcpHandler(() => buildServer(env, props)).fetch(request)
+  },
+}

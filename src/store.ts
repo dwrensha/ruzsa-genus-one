@@ -178,6 +178,28 @@ export function allWitnesses(env: Bindings): Promise<WitnessListRow[]> {
     .then((r) => r.results)
 }
 
+/** The current record witness for one modulus, with its element list. */
+export interface RecordDetail {
+  id: number
+  n: number
+  size: number
+  ratio: number
+  elements: string // JSON array text
+  created_at: string
+  submitter: string | null
+}
+
+export function currentRecordForModulus(env: Bindings, n: number): Promise<RecordDetail | null> {
+  return env.DB.prepare(
+    `SELECT w.id, w.n, w.size, w.ratio, w.elements, w.created_at,
+            u.display_name AS submitter
+       FROM witnesses w LEFT JOIN users u ON u.id = w.submitter_user_id
+       WHERE w.n = ? ORDER BY w.size DESC LIMIT 1`,
+  )
+    .bind(n)
+    .first<RecordDetail>()
+}
+
 export type ValidResult = Extract<VerifyResult, { ok: true }>
 
 export interface RecordStatus {
