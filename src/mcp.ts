@@ -28,9 +28,17 @@ export interface McpProps extends Record<string, unknown> {
 const PROBLEM_BLURB =
   `Ruzsa's genus-one problem: fix a modulus N and find a large subset A of Z/NZ ` +
   `with no nontrivial solutions to a + 3b ≡ 2c + 2d (mod N) — nontrivial meaning ` +
-  `not all of a, b, c, d equal. The score for a valid set is |A|/√N; the site ` +
-  `records the largest known valid set for each N. Limits: 2 ≤ N ≤ ${MAX_N}, ` +
-  `|A| ≤ ${MAX_SET_SIZE}.`
+  `not all of a, b, c, d equal. Two scores are reported for a valid set: ratio = |A|/√N ` +
+  `and exponent = log|A|/log N. Best known constructions sit at the √N barrier ` +
+  `(ratio ≈ 1, exponent ≈ 0.5); the conjecture is that exponents approaching 1 are ` +
+  `possible, so anything with ratio > 1 (exponent > 0.5) would be a breakthrough. ` +
+  `The site records the largest known valid set for each N. ` +
+  `Limits: 2 ≤ N ≤ ${MAX_N}, |A| ≤ ${MAX_SET_SIZE}.`
+
+/** log|A| / log N — the site's "exponent" score (√N barrier = 0.5). */
+function exponentOf(n: number, size: number): number {
+  return Math.log(size) / Math.log(n)
+}
 
 const setInputSchema = z.object({
   n: z.number().int().describe(`The modulus N (2 ≤ N ≤ ${MAX_N}).`),
@@ -83,6 +91,7 @@ function buildServer(env: Bindings, props: McpProps): McpServer {
           n: r.n,
           size: r.size,
           ratio: r.size / Math.sqrt(r.n),
+          exponent: exponentOf(r.n, r.size),
           witnessId: r.id,
           url: `https://ruzsa-genus-one.icarm.cloud/witness/${r.id}`,
         })),
@@ -111,6 +120,7 @@ function buildServer(env: Bindings, props: McpProps): McpServer {
           witnessId: record.id,
           size: record.size,
           ratio: record.ratio,
+          exponent: exponentOf(record.n, record.size),
           elements: JSON.parse(record.elements) as number[],
           submitter: record.submitter,
           created_at: record.created_at,
@@ -138,7 +148,7 @@ function buildServer(env: Bindings, props: McpProps): McpServer {
       // The reduced element list is redundant for tool output (the caller
       // already has the set); dropping it keeps responses small.
       const { elements: _elements, ...rest } = result
-      return jsonResult(rest)
+      return jsonResult({ ...rest, exponent: exponentOf(result.N, result.size) })
     },
   )
 
@@ -171,7 +181,8 @@ function buildServer(env: Bindings, props: McpProps): McpServer {
       if (limited) return limited
       const result = verify(n, elements)
       if (!result.ok) return jsonResult(result, true)
-      const { elements: _elements, ...rest } = result
+      const { elements: _elements, ...withoutElements } = result
+      const rest = { ...withoutElements, exponent: exponentOf(result.N, result.size) }
       if (!result.valid) return jsonResult(rest)
       const record = await recordWitness(env, result, props.userId)
       // Commentary only lands on a record-setting submission: the new witness
