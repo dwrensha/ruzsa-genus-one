@@ -30,8 +30,9 @@
       "id": "f0772db84c0c470aa2eee6622fb57f81"
     }
   ],
-  // Required by clientIdMetadataDocumentEnabled (CIMD client registration):
-  // makes outbound fetch refuse private-network destinations (SSRF guard).
+  // SSRF guard: outbound fetch refuses private-network destinations. Also a
+  // prerequisite for CIMD client registration, should it be re-enabled in
+  // index.ts (see the clientIdMetadataDocumentEnabled comment there).
   "compatibility_flags": ["global_fetch_strictly_public"],
   "ratelimits": [
     {

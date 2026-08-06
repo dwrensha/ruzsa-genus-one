@@ -1,5 +1,6 @@
 import {
   AuthorizationError,
+  CimdFetchError,
   OAuthProvider,
   type AuthRequest,
 } from '@cloudflare/workers-oauth-provider'
@@ -432,6 +433,12 @@ app.get('/oauth/authorize', async (c) => {
   try {
     oauthRequest = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw)
   } catch (error) {
+    if (error instanceof CimdFetchError) {
+      return c.text(
+        `could not resolve the client's metadata document (${error.metadataUrl}): ${error.detail}`,
+        502,
+      )
+    }
     if (!(error instanceof AuthorizationError)) throw error
     if (!error.redirectUri) return c.text(error.description, 400)
     return oauthErrorRedirect(
@@ -471,6 +478,12 @@ app.post('/oauth/authorize', async (c) => {
   try {
     oauthRequest = await c.env.OAUTH_PROVIDER.parseAuthRequest(synthetic)
   } catch (error) {
+    if (error instanceof CimdFetchError) {
+      return c.text(
+        `could not resolve the client's metadata document (${error.metadataUrl}): ${error.detail}`,
+        502,
+      )
+    }
     if (!(error instanceof AuthorizationError)) throw error
     return c.text(error.description, 400)
   }
@@ -515,7 +528,13 @@ const provider = new OAuthProvider<Bindings>({
   scopesSupported: ['submit'],
   // Preferred registration path for MCP clients (2026 spec); DCR kept for
   // compatibility with clients that predate CIMD.
-  clientIdMetadataDocumentEnabled: true,
+  // CIMD is deliberately OFF: workers-oauth-provider (as of 0.10.1) only
+  // accepts CIMD clients declaring token_endpoint_auth_method "none", and
+  // ChatGPT's client.json declares "private_key_jwt" — so advertising CIMD
+  // makes ChatGPT prefer it and then fail. With it off, clients fall back to
+  // dynamic client registration below, which both Claude.ai and ChatGPT
+  // support. Re-enable once the provider accepts such clients.
+  clientIdMetadataDocumentEnabled: false,
   clientRegistrationEndpoint: '/oauth/register',
 })
 
