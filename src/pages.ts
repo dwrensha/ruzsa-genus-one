@@ -524,7 +524,7 @@ export function apiDocsPage(user: User | null = null): string {
   const verifyReq = `curl -X POST https://ruzsa-genus-one.icarm.cloud/api/verify \\
   -H 'content-type: application/json' \\
   -H 'authorization: Bearer ruzsa_...' \\
-  -d '{ "N": 49, "A": [0, 7, 13, 29, 41] }'`
+  -d '{ "N": 49, "A": [0, 7, 13, 29, 41], "commentary": "optional note for the witness page" }'`
   const verifyResp = `{
   "ok": true,
   "N": 49,
@@ -562,6 +562,12 @@ export function apiDocsPage(user: User | null = null): string {
       <code>record.recordSize</code> reports the standing record. When a valid submission ties the
       record, <code>record.tiedExact</code> reports whether it is element-for-element the record
       witness itself (<code>true</code>) or a different set of the same size (<code>false</code>).</p>
+      <p>An optional <code>commentary</code> string (at most ${COMMENT_MAX.toLocaleString(
+        'en-US',
+      )} characters) becomes the new witness page&rsquo;s commentary when &mdash; and only
+      when &mdash; the submission sets a record; the response then carries
+      <code>commentaryApplied</code>. It can be edited later on the witness page, with full
+      edit history kept.</p>
       <pre><code>${escapeHtml(verifyResp)}</code></pre>
       <p>An invalid set instead gets <code>valid: false</code> and one concrete nontrivial solution
       (no <code>record</code> field):</p>

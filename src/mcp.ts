@@ -10,7 +10,13 @@ import { createMcpHandler, McpServer } from '@modelcontextprotocol/server'
 import * as z from 'zod'
 import type { Bindings } from './auth'
 import { checkSubmissionRateLimit } from './rateLimit'
-import { currentRecordForModulus, currentRecords, recordWitness } from './store'
+import {
+  COMMENT_MAX,
+  currentRecordForModulus,
+  currentRecords,
+  postCommentary,
+  recordWitness,
+} from './store'
 import { MAX_N, MAX_SET_SIZE, verify } from './verify'
 
 /** Stored in the OAuth grant at consent time; decrypted into ctx.props. */
@@ -145,10 +151,22 @@ function buildServer(env: Bindings, props: McpProps): McpServer {
         `for its modulus, record it as the new record attributed to the authenticated user ` +
         `(${props.displayName ?? 'unnamed user'}). Anything else — invalid, or valid but not ` +
         `record-setting — is reported but not stored. Verify locally with verify_witness ` +
-        `first if unsure; both tools share the submission rate limit.`,
-      inputSchema: setInputSchema,
+        `first if unsure; both tools share the submission rate limit. Optional commentary ` +
+        `(how the set was constructed, search method, etc.) is attached to the new witness ` +
+        `page when — and only when — the submission sets a record.`,
+      inputSchema: setInputSchema.extend({
+        commentary: z
+          .string()
+          .max(COMMENT_MAX)
+          .optional()
+          .describe(
+            `Optional public commentary for the new witness page — e.g. how the set was found. ` +
+              `Applied only when the submission sets a record; editable later on the website. ` +
+              `At most ${COMMENT_MAX} characters.`,
+          ),
+      }),
     },
-    async ({ n, elements }) => {
+    async ({ n, elements, commentary }) => {
       const limited = await rateLimited(env, props.userId)
       if (limited) return limited
       const result = verify(n, elements)
@@ -156,9 +174,19 @@ function buildServer(env: Bindings, props: McpProps): McpServer {
       const { elements: _elements, ...rest } = result
       if (!result.valid) return jsonResult(rest)
       const record = await recordWitness(env, result, props.userId)
+      // Commentary only lands on a record-setting submission: the new witness
+      // is the submitter's own row, so nobody else's notes are at risk.
+      let commentaryApplied: boolean | undefined
+      if (typeof commentary === 'string' && commentary.trim() !== '') {
+        commentaryApplied = record.recorded
+        if (record.recorded) {
+          await postCommentary(env, record.witnessId, props.userId, commentary)
+        }
+      }
       return jsonResult({
         ...rest,
         record,
+        ...(commentaryApplied !== undefined ? { commentaryApplied } : {}),
         ...(record.recorded
           ? { url: `https://ruzsa-genus-one.icarm.cloud/witness/${record.witnessId}` }
           : {}),

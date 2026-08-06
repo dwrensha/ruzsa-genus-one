@@ -353,12 +353,23 @@ app.post('/api/verify', async (c) => {
   } catch {
     return c.json({ ok: false, error: 'request body must be JSON' }, 400)
   }
-  const { N, A } = (body ?? {}) as { N?: unknown; A?: unknown }
+  const { N, A, commentary } = (body ?? {}) as { N?: unknown; A?: unknown; commentary?: unknown }
   if (typeof N !== 'number' || !Array.isArray(A)) {
     return c.json(
       { ok: false, error: 'expected {"N": <integer>, "A": [<integers>]}' },
       400,
     )
+  }
+  if (commentary !== undefined) {
+    if (typeof commentary !== 'string') {
+      return c.json({ ok: false, error: 'commentary must be a string' }, 400)
+    }
+    if (commentary.length > COMMENT_MAX) {
+      return c.json(
+        { ok: false, error: `commentary may be at most ${COMMENT_MAX} characters` },
+        400,
+      )
+    }
   }
   if (A.length > MAX_SET_SIZE) {
     return c.json({ ok: false, error: `the set may have at most ${MAX_SET_SIZE} elements` }, 400)
@@ -369,12 +380,25 @@ app.post('/api/verify', async (c) => {
   const result = verify(N, A as number[])
   if (!result.ok) return c.json(result, 400)
   let record: RecordStatus | undefined
+  // Commentary rides along only when the submission sets a record: the new
+  // witness is the submitter's own row, so nobody else's notes are at risk.
+  let commentaryApplied: boolean | undefined
   if (result.valid) {
     record = await recordWitness(c.env, result, user.id)
+    if (typeof commentary === 'string' && commentary.trim() !== '') {
+      commentaryApplied = record.recorded
+      if (record.recorded) {
+        await postCommentary(c.env, record.witnessId, user.id, commentary)
+      }
+    }
   }
   // Echoing the (possibly large) element list back is redundant for API users.
   const { elements: _elements, ...rest } = result
-  return c.json(record ? { ...rest, record } : rest)
+  return c.json(
+    record
+      ? { ...rest, record, ...(commentaryApplied !== undefined ? { commentaryApplied } : {}) }
+      : rest,
+  )
 })
 
 // ---------------------------------------------------------------------------
