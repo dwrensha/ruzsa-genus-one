@@ -1,6 +1,5 @@
 import {
   AuthorizationError,
-  CimdFetchError,
   OAuthProvider,
   type AuthRequest,
 } from '@cloudflare/workers-oauth-provider'
@@ -411,6 +410,45 @@ app.post('/api/verify', async (c) => {
 // endpoint is the one piece it delegates to the application: authenticate the
 // user (via the existing GitHub-backed session) and ask for consent.
 
+// --- ChatGPT client pre-registration ----------------------------------------
+// Most MCP clients (Claude.ai, MCP Inspector, ...) register themselves via
+// dynamic client registration at /oauth/register. ChatGPT instead identifies
+// itself with a Client ID Metadata Document: its client_id is a URL like
+// https://chatgpt.com/oauth/<slug>/client.json. Serving that the intended way
+// is blocked twice over — workers-oauth-provider (0.10.1) rejects CIMD clients
+// that declare private_key_jwt (ChatGPT does, though it supports plain PKCE
+// too), and chatgpt.com's CDN 403s metadata fetches from the Workers runtime
+// anyway. Fortunately ChatGPT's client_id and redirect URI are rigidly paired
+// by the slug (client.json above ↔ /connector/oauth/<slug>), so its
+// registration can be derived without fetching anything. With the provider's
+// own CIMD support off, URL-shaped client ids resolve through the ordinary
+// OAUTH_KV registration lookup — so pre-register ChatGPT's identity on sight.
+//
+// Safe: authorization codes can only redirect back to chatgpt.com, PKCE binds
+// them to the flow's real initiator, and the provider still enforces exact
+// redirect-URI matching. Revisit if the provider's CIMD support learns to
+// accept clients like ChatGPT (then delete this and enable CIMD instead).
+async function seedChatGptClient(env: Bindings, clientId: string | null): Promise<void> {
+  const m = clientId?.match(/^https:\/\/chatgpt\.com\/oauth\/([A-Za-z0-9_-]+)\/client\.json$/)
+  if (!m) return
+  await env.OAUTH_KV.put(
+    `client:${clientId}`,
+    JSON.stringify({
+      clientId,
+      redirectUris: [`https://chatgpt.com/connector/oauth/${m[1]}`],
+      clientName: 'ChatGPT',
+      clientUri: 'https://chatgpt.com/',
+      grantTypes: ['authorization_code', 'refresh_token'],
+      responseTypes: ['code'],
+      registrationDate: Math.floor(Date.now() / 1000),
+      tokenEndpointAuthMethod: 'none',
+    }),
+    // The provider's default TTL for dynamically registered clients; refreshed
+    // on every authorize, so an actively used connector never expires.
+    { expirationTtl: 90 * 24 * 60 * 60 },
+  )
+}
+
 // An OAuth error redirect back to the client, per the provider README: only
 // safe when parseAuthRequest attached a redirectUri (client + URI validated).
 function oauthErrorRedirect(
@@ -429,16 +467,11 @@ function oauthErrorRedirect(
 }
 
 app.get('/oauth/authorize', async (c) => {
+  await seedChatGptClient(c.env, c.req.query('client_id') ?? null)
   let oauthRequest: AuthRequest
   try {
     oauthRequest = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw)
   } catch (error) {
-    if (error instanceof CimdFetchError) {
-      return c.text(
-        `could not resolve the client's metadata document (${error.metadataUrl}): ${error.detail}`,
-        502,
-      )
-    }
     if (!(error instanceof AuthorizationError)) throw error
     if (!error.redirectUri) return c.text(error.description, 400)
     return oauthErrorRedirect(
@@ -474,16 +507,12 @@ app.post('/oauth/authorize', async (c) => {
   // fields for individual OAuth parameters; parseAuthRequest re-validates
   // the client, redirect URI, and PKCE from scratch.
   const synthetic = new Request(`${new URL(c.req.url).origin}/oauth/authorize?${form.query}`)
+  // Rare, but the seeded client record may have expired between GET and POST.
+  await seedChatGptClient(c.env, new URLSearchParams(form.query).get('client_id'))
   let oauthRequest: AuthRequest
   try {
     oauthRequest = await c.env.OAUTH_PROVIDER.parseAuthRequest(synthetic)
   } catch (error) {
-    if (error instanceof CimdFetchError) {
-      return c.text(
-        `could not resolve the client's metadata document (${error.metadataUrl}): ${error.detail}`,
-        502,
-      )
-    }
     if (!(error instanceof AuthorizationError)) throw error
     return c.text(error.description, 400)
   }
@@ -535,12 +564,11 @@ const provider = new OAuthProvider<Bindings>({
   refreshTokenTTL: 90 * 24 * 60 * 60,
   // Preferred registration path for MCP clients (2026 spec); DCR kept for
   // compatibility with clients that predate CIMD.
-  // CIMD is deliberately OFF: workers-oauth-provider (as of 0.10.1) only
-  // accepts CIMD clients declaring token_endpoint_auth_method "none", and
-  // ChatGPT's client.json declares "private_key_jwt" — so advertising CIMD
-  // makes ChatGPT prefer it and then fail. With it off, clients fall back to
-  // dynamic client registration below, which both Claude.ai and ChatGPT
-  // support. Re-enable once the provider accepts such clients.
+  // The provider's own CIMD support is deliberately OFF — it can't serve
+  // ChatGPT (see seedChatGptClient above), and every other known client uses
+  // dynamic client registration. With it off, URL-shaped client ids resolve
+  // through the ordinary OAUTH_KV lookup, which is what makes the ChatGPT
+  // pre-registration work.
   clientIdMetadataDocumentEnabled: false,
   clientRegistrationEndpoint: '/oauth/register',
 })
