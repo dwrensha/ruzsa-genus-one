@@ -979,6 +979,36 @@ export function consentPage(
   return layout(`Authorize ${clientName} — ${SITE_NAME}`, body, user)
 }
 
+/**
+ * Shown to a person who opens /mcp in a browser. MCP clients never see this:
+ * they don't ask for text/html, so they get the OAuth 401 challenge instead.
+ */
+export function mcpInfoPage(user: User | null = null): string {
+  const body = `
+    <section class="prose">
+      <p class="page-nav"><a href="/">&larr; home</a></p>
+      <h2>MCP endpoint</h2>
+      <p>This URL is a <a class="external" href="https://modelcontextprotocol.io">Model Context
+      Protocol</a> server, meant for AI assistants rather than browsers. Connect an MCP client
+      to it and the assistant can look up records, verify candidate sets, and submit witnesses
+      from inside a conversation.</p>
+      <ul>
+        <li><strong>Claude.ai</strong> &mdash; add <code>https://ruzsa-genus-one.icarm.cloud/mcp</code>
+        under Settings &rarr; Connectors (on Team/Enterprise plans an Owner adds it in
+        Organization settings &rarr; Connectors).</li>
+        <li><strong>ChatGPT</strong> &mdash; add it as a connector in developer mode.</li>
+        <li><strong>Claude Code / other MCP clients</strong> &mdash; point them at the same URL
+        (streamable HTTP transport).</li>
+      </ul>
+      <p>Connecting signs you in with GitHub &mdash; the same account as this website &mdash; and
+      record submissions made through the connector are attributed to you.</p>
+      <p>Tools: <code>list_records</code>, <code>get_record</code>, <code>verify_witness</code>,
+      <code>submit_witness</code>. See the <a href="/api">API docs</a> for details, including the
+      plain JSON API.</p>
+    </section>`
+  return layout(`MCP endpoint — ${SITE_NAME}`, body, user)
+}
+
 export function notFoundPage(user: User | null = null): string {
   return layout('Not found', `<section class="prose"><p>Page not found.</p></section>`, user)
 }

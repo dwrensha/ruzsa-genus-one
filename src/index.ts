@@ -12,6 +12,7 @@ import {
   commentaryHistoryPage,
   consentPage,
   landingPage,
+  mcpInfoPage,
   notFoundPage,
   profilePage,
   resultPage,
@@ -494,13 +495,18 @@ app.post('/oauth/authorize', async (c) => {
   return c.redirect(redirectTo, 302)
 })
 
+// Help text for a person who opens the MCP endpoint in a browser. Only
+// reachable via the front-door check below — the OAuth provider otherwise
+// answers every unauthenticated /mcp request itself with a bare 401.
+app.get('/mcp', (c) => c.html(mcpInfoPage(c.get('user'))))
+
 app.notFound((c) => c.html(notFoundPage(c.get('user')), 404))
 
 // The provider owns /mcp (bearer-token validation → mcpApiHandler),
 // /oauth/token, /oauth/register, and the /.well-known metadata endpoints.
 // Everything else — the site, plus /oauth/authorize above — falls through to
 // the Hono app.
-export default new OAuthProvider<Bindings>({
+const provider = new OAuthProvider<Bindings>({
   apiRoute: '/mcp',
   apiHandler: mcpApiHandler,
   defaultHandler: { fetch: (req, env, ctx) => app.fetch(req, env, ctx) },
@@ -512,3 +518,22 @@ export default new OAuthProvider<Bindings>({
   clientIdMetadataDocumentEnabled: true,
   clientRegistrationEndpoint: '/oauth/register',
 })
+
+// Front door: a person opening /mcp in a browser (GET, wants HTML, no bearer
+// token) gets the help page instead of the provider's empty 401. MCP clients
+// never ask for text/html, so their discovery flow — including the 401 with
+// the WWW-Authenticate challenge — is untouched.
+export default {
+  fetch(request: Request, env: Bindings, ctx: ExecutionContext): Response | Promise<Response> {
+    const url = new URL(request.url)
+    if (
+      url.pathname === '/mcp' &&
+      request.method === 'GET' &&
+      !request.headers.has('authorization') &&
+      (request.headers.get('accept') ?? '').includes('text/html')
+    ) {
+      return app.fetch(request, env, ctx)
+    }
+    return provider.fetch(request, env, ctx)
+  },
+}
