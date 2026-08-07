@@ -275,7 +275,7 @@ function recordsSection(records: RecordPoint[], plot: PlotKind): string {
     ${inner}
     <p class="muted plot-caption">Each dot is the largest known witness for its modulus.
     A dot above the dashed line beats &radic;<span class="sqrt">N</span>.</p>
-    <p class="plot-caption"><a href="/witnesses">Browse all witnesses &rarr;</a> &nbsp;&middot;&nbsp;
+    <p class="plot-caption"><a href="/witnesses">Browse witnesses &rarr;</a> &nbsp;&middot;&nbsp;
     <a href="/recent">Recent activity &rarr;</a> &nbsp;&middot;&nbsp;
     <a class="external nowrap" href="https://icarm.zulipchat.com/#narrow/channel/519875-general/topic/Ruzsa.20Genus.20One/near/614443028">Discuss on Zulip</a></p>
     <p class="plot-caption"><a class="nowrap" href="/database.json" download>Download all records (JSON) &darr;</a></p>
@@ -801,7 +801,7 @@ const WITNESS_SORT_DEFAULT_DIR: Record<WitnessSortKey, 'asc' | 'desc'> = {
 
 export function witnessesPage(
   rows: WitnessListRow[],
-  query: { sort?: string; dir?: string; current?: string; n?: string },
+  query: { sort?: string; dir?: string; all?: string; n?: string },
   user: User | null = null,
 ): string {
   const sort: WitnessSortKey = (WITNESS_SORT_KEYS as readonly string[]).includes(query.sort ?? '')
@@ -809,8 +809,10 @@ export function witnessesPage(
     : 'score'
   const dir: 'asc' | 'desc' =
     query.dir === 'asc' || query.dir === 'desc' ? query.dir : WITNESS_SORT_DEFAULT_DIR[sort]
-  const currentOnly = query.current === '1'
   const nFilter = /^\d+$/.test(query.n ?? '') ? Number(query.n) : null
+  // Current records only is the default; ?all=1 opts into superseded rows.
+  // A modulus filter always shows that modulus's full record history.
+  const currentOnly = nFilter === null && query.all !== '1'
 
   const exponent = (w: WitnessListRow) => Math.log(w.size) / Math.log(w.n)
   const keyValue: Record<WitnessSortKey, (w: WitnessListRow) => number | string> = {
@@ -844,8 +846,8 @@ export function witnessesPage(
       q.set('sort', s)
       q.set('dir', d)
     }
-    if (current) q.set('current', '1')
     if (n !== null) q.set('n', String(n))
+    else if (!current) q.set('all', '1')
     const qs = q.toString()
     return '/witnesses' + (qs ? '?' + qs : '')
   }
@@ -874,16 +876,20 @@ export function witnessesPage(
     )
     .join('\n')
 
-  const filterToggle = currentOnly
-    ? `<a href="${href(sort, dir, false)}">all</a> &middot; <strong>current records only</strong>`
-    : `<strong>all</strong> &middot; <a href="${href(sort, dir, true)}">current records only</a>`
-  // The modulus filter is a plain GET form (the page has no JS); hidden inputs
-  // mirror href() so submitting preserves the sort and current-only state.
-  const hiddenState =
-    (sort === 'score' && dir === 'desc'
+  // A modulus filter always shows the full history, so the toggle only appears
+  // on the unfiltered view.
+  const filterToggle =
+    nFilter !== null
       ? ''
-      : `<input type="hidden" name="sort" value="${sort}"><input type="hidden" name="dir" value="${dir}">`) +
-    (currentOnly ? '<input type="hidden" name="current" value="1">' : '')
+      : currentOnly
+        ? `<strong>current records</strong> &middot; <a href="${href(sort, dir, false)}">include superseded</a> &nbsp;&middot;&nbsp; `
+        : `<a href="${href(sort, dir, true)}">current records</a> &middot; <strong>include superseded</strong> &nbsp;&middot;&nbsp; `
+  // The modulus filter is a plain GET form (the page has no JS); hidden inputs
+  // mirror href() so submitting preserves the sort state.
+  const hiddenState =
+    sort === 'score' && dir === 'desc'
+      ? ''
+      : `<input type="hidden" name="sort" value="${sort}"><input type="hidden" name="dir" value="${dir}">`
   const modulusFilter =
     `<form class="inline-form modulus-filter" method="get" action="/witnesses">${hiddenState}` +
     `<label>N&nbsp;=&nbsp;<input name="n" type="number" min="2" max="50000" step="1" ` +
@@ -891,20 +897,22 @@ export function witnessesPage(
     `<button class="link-button" type="submit">filter</button></form>` +
     (nFilter === null
       ? ''
-      : ` &middot; <a href="${href(sort, dir, currentOnly, null)}">clear</a>`)
+      : ` &middot; <a href="${href(sort, dir, true, null)}">clear</a>`)
   const nLabel = nFilter === null ? '' : ` for N = ${nFilter.toLocaleString('en-US')}`
   const heading = (currentOnly ? 'Current record witnesses' : 'All witnesses') + nLabel
+  const description = currentOnly
+    ? 'The largest known witness for each modulus.'
+    : `Every record-setting witness ever submitted${nLabel ? ' for this modulus' : ''}; a
+      superseded row was the record${nLabel ? '' : ' for its modulus'} until a larger set beat it.`
 
   const body = `
     <section class="prose">
       <p class="page-nav"><a href="/">&larr; home</a></p>
       <h2>${heading}</h2>
-      <p class="muted">Every record-setting witness ever submitted; a superseded row was the
-      record for its modulus until a larger set beat it. Click a column header to sort; click
+      <p class="muted">${description} Click a column header to sort; click
       again to reverse.</p>
       <div class="table-controls muted">showing ${shown.length} of ${rows.length} witnesses
-        &nbsp;&middot;&nbsp; ${filterToggle}
-        &nbsp;&middot;&nbsp; ${modulusFilter}
+        &nbsp;&middot;&nbsp; ${filterToggle}${modulusFilter}
         &nbsp;&middot;&nbsp; <a href="/database.json" download>Download (JSON) &darr;</a></div>
       <div class="table-scroll">
       <table class="tokens-table witnesses-table">

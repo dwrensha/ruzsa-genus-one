@@ -150,7 +150,7 @@ app.get('/witnesses', async (c) =>
       {
         sort: c.req.query('sort'),
         dir: c.req.query('dir'),
-        current: c.req.query('current'),
+        all: c.req.query('all'),
         n: c.req.query('n'),
       },
       c.get('user'),
