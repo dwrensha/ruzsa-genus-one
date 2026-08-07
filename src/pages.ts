@@ -127,8 +127,8 @@ function problemStatement(): string {
       The best known constructions achieve
       |<var>A</var>| = &Theta;(&radic;<span class="sqrt">N</span>), while the
       conjecture is that |<var>A</var>| = <var>N</var><sup>1&minus;o(1)</sup>
-      is possible. The challenge: find a witness with score
-      |<var>A</var>|&thinsp;/&thinsp;&radic;<span class="sqrt">N</span> &gt; 1.
+      is possible. The challenge: find a witness with
+      |<var>A</var>| &gt; &radic;<span class="sqrt">N</span>.
     </p>
   </section>`
 }
